@@ -26,10 +26,10 @@ jobs:
     - name: Grant Execute Permission for Gradlew
       run: chmod +x gradlew
 
-    - name: Build APK (Release & Debug)
-      run: ./gradlew assembleDebug assembleRelease --stacktrace
+    - name: Build APK (Debug)
+      run: ./gradlew assembleDebug --stacktrace
 
-    - name: Upload Debug APK Artifact
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: LimenEyes-Debug-APK
@@ -37,23 +37,22 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v1.1.0 --yes || true
-        git push origin :refs/tags/v1.1.0 || true
+        gh release delete v1.2.0 --yes || true
+        git push origin :refs/tags/v1.2.0 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v1.1.0
+    - name: Create GitHub Release v1.2.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.1.0
-        name: "LIMEN EYES v1.1.0 - Official Release"
+        tag_name: v1.2.0
+        name: "LIMEN EYES v1.2.0 - Google & Firebase Auth"
         body: |
-          ### 📱 LIMEN EYES APK - Versión Oficial 1.1.0
-          - Nombre oficial en mayúsculas: **LIMEN EYES**.
-          - Nuevo icono oficial con lente de cámara y halo violeta neón.
-          - Optimizaciones de aceleración por hardware y pantalla completa sin comportamientos web.
-          - Centralización y control de usuarios desde **Limen Admin**.
-          - Soporte mejorado para redes dinámicas y conexiones vía Starlink / CGNAT.
+          ### 📱 LIMEN EYES v1.2.0 - APK
+          - Ingreso nativo y autorización con **Google Sign-In** (Limby / Firebase).
+          - Vinculación directa con Limen Admin: permisos y cámaras autorizadas por usuario.
+          - Nombre oficial: **LIMEN EYES**.
+          - Logo y favdon neón pñrpura oficial.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
