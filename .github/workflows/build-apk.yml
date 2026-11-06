@@ -35,24 +35,25 @@ jobs:
         name: LimenEyes-Debug-APK
         path: app/build/outputs/apk/debug/app-debug.apk
 
-    - name: Upload Release APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: LimenEyes-Release-APK
-        path: app/build/outputs/apk/release/app-release-unsigned.apk
+    - name: Delete old release tag if exists
+      run: |
+        gh release delete v1.1.0 --yes || true
+        git push origin :refs/tags/v1.1.0 || true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release
+    - name: Create GitHub Release v1.1.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.0.0
-        name: "LimenEyes v1.0.0 - EasyViewer Pro UX"
+        tag_name: v1.1.0
+        name: "LIMEN EYES v1.1.0 - Official Release"
         body: |
-          ### 📱 LimenEyes APK - Versión Oficial 1.0.0
-          - UX / UI inspirada en EasyViewer Pro con distintivos violetas (#a855f7).
-          - Control y administración centralizada por usuario desde Limen Admin.
-          - Conexión P2P segura centralizada a través de `https://eyes.limenseguridad.com`.
-          - Calidad SD por defecto con selector instantáneo a HD.
-          - Capturas instantáneas de fotograma en cliente a 0 ms.
+          ### 📱 LIMEN EYES APK - Versión Oficial 1.1.0
+          - Nombre oficial en mayúsculas: **LIMEN EYES**.
+          - Nuevo icono oficial con lente de cámara y halo violeta neón.
+          - Optimizaciones de aceleración por hardware y pantalla completa sin comportamientos web.
+          - Centralización y control de usuarios desde **Limen Admin**.
+          - Soporte mejorado para redes dinámicas y conexiones vía Starlink / CGNAT.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
