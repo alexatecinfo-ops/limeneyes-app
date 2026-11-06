@@ -38,90 +38,112 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "LimenEyes";
 
     private GoogleSignInClient mGoogleSignInClient;
-    private ActivityResultLauncher<Intent> googleSignInLauncher;
+
+    // Se registra el launcher en la inicialización del campo (antes de onCreate)
+    private final ActivityResultLauncher<Intent> googleSignInLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                try {
+                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
+                    handleSignInResult(task);
+                } catch (Throwable t) {
+                    Log.e(TAG, "Error procesando resultado Google Sign-In", t);
+                }
+            }
+    );
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Window window = getWindow();
-        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.parseColor("#0b0f17"));
-        window.setNavigationBarColor(Color.parseColor("#0b0f17"));
+        try {
+            Window window = getWindow();
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.parseColor("#0b0f17"));
+            window.setNavigationBarColor(Color.parseColor("#0b0f17"));
 
-        setContentView(R.layout.activity_main);
+            setContentView(R.layout.activity_main);
 
-        swipeLayout = findViewById(R.id.swipeRefresh);
-        webView = findViewById(R.id.webView);
+            swipeLayout = findViewById(R.id.swipeRefresh);
+            webView = findViewById(R.id.webView);
 
-        swipeLayout.setColorSchemeColors(Color.parseColor("#a855f7"));
-        swipeLayout.setProgressBackgroundColorSchemeColor(Color.parseColor("#151d2a"));
-        swipeLayout.setOnRefreshListener(() -> webView.reload());
+            swipeLayout.setColorSchemeColors(Color.parseColor("#a855f7"));
+            swipeLayout.setProgressBackgroundColorSchemeColor(Color.parseColor("#151d2a"));
+            swipeLayout.setOnRefreshListener(() -> webView.reload());
 
-        // Google Sign-In Setup
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .requestId()
-                .requestProfile()
-                .requestIdToken("371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com")
-                .build();
-        mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+            // Inicialización segura de Google Sign-In Client
+            try {
+                GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestId()
+                        .requestProfile()
+                        .requestIdToken("371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com")
+                        .build();
+                mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+            } catch (Throwable t) {
+                Log.e(TAG, "Error inicializando GoogleSignInClient", t);
+            }
 
-        googleSignInLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
-                    handleSignInResult(task);
+            WebSettings ws = webView.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            ws.setDatabaseEnabled(true);
+            ws.setMediaPlaybackRequiresUserGesture(false);
+            ws.setAllowFileAccess(false);
+            ws.setAllowContentAccess(false);
+            ws.setCacheMode(WebSettings.LOAD_DEFAULT);
+            ws.setUserAgentString(ws.getUserAgentString() + " LimenEyesApp/1.0");
+
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            webView.setBackgroundColor(Color.parseColor("#0b0f17"));
+
+            webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
+
+            CookieManager cookieManager = CookieManager.getInstance();
+            cookieManager.setAcceptCookie(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                cookieManager.setAcceptThirdPartyCookies(webView, true);
+            }
+
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    if (swipeLayout != null) {
+                        swipeLayout.setRefreshing(false);
+                    }
                 }
-        );
+            });
 
-        WebSettings ws = webView.getSettings();
-        ws.setJavaScriptEnabled(true);
-        ws.setDomStorageEnabled(true);
-        ws.setDatabaseEnabled(true);
-        ws.setMediaPlaybackRequiresUserGesture(false);
-        ws.setAllowFileAccess(false);
-        ws.setAllowContentAccess(false);
-        ws.setCacheMode(WebSettings.LOAD_DEFAULT);
-        ws.setUserAgentString(ws.getUserAgentString() + " LimenEyesApp/1.0");
+            webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    request.grant(request.getResources());
+                }
+            });
 
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        webView.setBackgroundColor(Color.parseColor("#0b0f17"));
-
-        webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
-
-        CookieManager cookieManager = CookieManager.getInstance();
-        cookieManager.setAcceptCookie(true);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            cookieManager.setAcceptThirdPartyCookies(webView, true);
+            webView.loadUrl(APP_URL);
+        } catch (Throwable t) {
+            Log.e(TAG, "CRITICAL ERROR en onCreate", t);
         }
-
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                swipeLayout.setRefreshing(false);
-            }
-        });
-
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                request.grant(request.getResources());
-            }
-        });
-
-        webView.loadUrl(APP_URL);
     }
 
     public class WebAppInterface {
         @JavascriptInterface
         public void startGoogleSignIn() {
             runOnUiThread(() -> {
-                Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-                googleSignInLauncher.launch(signInIntent);
+                try {
+                    if (mGoogleSignInClient != null) {
+                        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                        googleSignInLauncher.launch(signInIntent);
+                    } else {
+                        Log.e(TAG, "mGoogleSignInClient es nulo");
+                    }
+                } catch (Throwable t) {
+                    Log.e(TAG, "Error lanzando intent Google Sign-In", t);
+                }
             });
         }
 
@@ -154,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) {
+        if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
