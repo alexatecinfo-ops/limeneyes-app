@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "371253197557",
+    "project_id": "limby-2d1db",
+    "storage_bucket": "limby-2d1db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:371253197557:android:efa11daf2ae017ac5963bc",
+        "android_client_info": {
+          "package_name": "com.limenseguridad.eyes"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBaJGhRrDXNhamUapi1wJmSAHyuXHe6o6s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
