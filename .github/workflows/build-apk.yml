@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,14 +43,13 @@ jobs:
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
       with:
         tag_name: v1.0.0
-        name: "LimenEyes v1.0.0 - EasyViewer Pro Mobile"
+        name: "LimenEyes v1.0.0 - EasyViewer Pro UX"
         body: |
           ### 📱 LimenEyes APK - Versión Oficial 1.0.0
           - UX / UI inspirada en EasyViewer Pro con distintivos violetas (#a855f7).
-          - Control de permisos centralizado por usuario vía Limen Admin.
+          - Control y administración centralizada por usuario desde Limen Admin.
           - Conexión P2P segura centralizada a través de `https://eyes.limenseguridad.com`.
           - Calidad SD por defecto con selector instantáneo a HD.
           - Capturas instantáneas de fotograma en cliente a 0 ms.
