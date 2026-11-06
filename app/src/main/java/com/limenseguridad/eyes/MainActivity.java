@@ -10,7 +10,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
-import android.webkit.JavaScriptInterface;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -23,7 +23,134 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import ½´¹½½±”¹…¹‘É½¥¹µÌ¹…ÕÑ ¹…Á¤¹Í¥¹¥¸¹½½±•M¥¹%¹±¥•¹Ðì)¥µÁ½ÉÐ½´¹½½±”¹…¹‘É½¥¹µÌ¹…ÕÑ ¹…Á¤¹Í¥¹¥¸¹½½±•M¥¹%¹=ÁÑ¥½¹Ìì)¥µÁ½ÉÐ½´¹½½±”¹…¹‘É½¥¹µÌ¹½µµ½¸¹…Á¤¹A%á•ÁÑ¥½¸ì)¥µÁ½ÉÐ½´¹½½±”¹…¹‘É½¥¹µÌ¹Ñ…Í­Ì¹Q…Í¬ì()¥µÁ½ÉÐ½Éœ¹©Í½¸¹)M=9=‰©•Ðì()ÁÕ‰±¥Œ±…ÍÌ5…¥¹Ñ¥Ù¥Ñä•áÑ•¹‘ÌÁÁ½µÁ…ÑÑ¥Ù¥Ñäì((€€€ÁÉ¥Ù…Ñ”]•‰Y¥•ÜÝ•‰Y¥•Üì(€€€ÁÉ¥Ù…Ñ”MÝ¥Á•I•™É•Í¡1…å½ÕÐÍÝ¥Á•1…å½ÕÐì(€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ™¥¹…°MÑÉ¥¹œAA}UI0€ô€‰¡ÑÑÁÌè¼½•å•Ì¹±¥µ•¹Í•ÕÉ¥‘…¹½´¼ˆì(€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ™¥¹…°MÑÉ¥¹œQ€ô€‰1¥µ•¹å•Ìˆì((€€€ÁÉ¥Ù…Ñ”½½±•M¥¹%¹±¥•¹Ðµ½½±•M¥¹%¹±¥•¹Ðì(€€€ÁÉ¥Ù…Ñ”Ñ¥Ù¥ÑåI•ÍÕ±Ñ1…Õ¹¡•Èñ%¹Ñ•¹Ðø½½±•M¥¹%¹1…Õ¹¡•Èì((€€€MÕÁÁÉ•ÍÍ1¥¹Ð ‰M•Ñ)…Ù…MÉ¥ÁÑ¹…‰±•ˆ¤(€€€=Ù•ÉÉ¥‘”(€€€ÁÉ½Ñ•Ñ•Ù½¥½¹É•…Ñ”¡	Õ¹‘±”Í…Ù•‘%¹ÍÑ…¹•MÑ…Ñ”¤ì(€€€€€€€ÍÕÁ•È¹½¹É•…Ñ”¡Í…Ù•‘%¹ÍÑ…¹•MÑ…Ñ”¤ì((€€€€€€€]¥¹‘½ÜÝ¥¹‘½Ü€ô•Ñ]¥¹‘½Ü ¤ì(€€€€€€€Ý¥¹‘½Ü¹±•…É±…Ì¡]¥¹‘½Ý5…¹…•È¹1…å½ÕÑA…É…µÌ¹1}QI9M1U9Q}MQQUL¤ì(€€€€€€€Ý¥¹‘½Ü¹…‘‘±…Ì¡]¥¹‘½Ý5…¹…•È¹1…å½ÕÑA…É…µÌ¹1}I]M}MeMQ5}	I}	-I=U9L¤ì(€€€€€€€Ý¥¹‘½Ü¹Í•ÑMÑ…ÑÕÍ	…É½±½È¡½±½È¹Á…ÉÍ•½±½È ˆŒÁˆÁ˜ÄÜˆ¤¤ì(€€€€€€€Ý¥¹‘½Ü¹Í•Ñ9…Ù¥…Ñ¥½¹	…É½±½È¡½±½È¹Á…ÉÍ•½±½È ˆŒÁˆÁ˜ÄÜˆ¤¤ì((€€€€€€€Í•Ñ½¹Ñ•¹ÑY¥•Ü¡H¹±…å½ÕÐ¹…Ñ¥Ù¥Ñå}µ…¥¸¤ì((€€€€€€€ÍÝ¥Á•1…å½ÕÐ€ô™¥¹‘Y¥•Ý	å%¡H¹¥¹ÍÝ¥Á•I•™É•Í ¤ì(€€€€€€€Ý•‰Y¥•Ü€ô™¥¹‘Y¥•Ý	å%¡H¹¥¹Ý•‰Y¥•Ü¤ì((€€€€€€€ÍÝ¥Á•1…å½ÕÐ¹Í•Ñ½±½ÉM¡•µ•½±½ÉÌ¡½±½È¹Á…ÉÍ•½±½È ˆ„àÔÕ˜Üˆ¤¤ì(€€€€€€€ÍÝ¥Á•1…å½ÕÐ¹Í•ÑAÉ½É•ÍÍ	…­É½Õ¹‘½±½ÉM¡•µ•½±½È¡½±½È¹Á…ÉÍ•½±½È ˆŒÄÔÅÉ„ˆ¤¤ì(€€€€€€€ÍÝ¥Á•1…å½ÕÐ¹Í•Ñ=¹I•™É•Í¡1¥ÍÑ•¹•È  ¤€´øÝ•‰Y¥•Ü¹É•±½… ¤¤ì((€€€€€€€€¼¼½½±”M¥¸µ%¸9…Ñ¥Ù¼(€€€€€€€½½±•M¥¹%¹=ÁÑ¥½¹ÌÍ¥¼€ô¹•Ü½½±•M¥¹%¹=ÁÑ¥½¹Ì¹	Õ¥±‘•È¡½½±•M¥¹%¹=ÁÑ¥½¹Ì¹U1Q}M%9}%8¤(€€€€€€€€€€€€€€€€¹É•ÅÕ•ÍÑµ…¥° ¤(€€€€€€€€€€€€€€€€¹É•ÅÕ•ÍÑ% ¤(€€€€€€€€€€€€€€€€¹É•ÅÕ•ÍÑAÉ½™¥±” ¤(€€€€€€€€€€€€€€€€¹É•ÅÕ•ÍÑ%‘Q½­•¸ ˆÌÜÄÈÔÌÄäÜÔÔÜµÕ°ÄÕ¡¬Ù‰ÈÝ…¡¥Í´ØÁ˜àÐåÕÑ‘„Ý¼Ù‰°¹…ÁÁÌ¹½½±•ÕÍ•É½¹Ñ•¹Ð¹½´ˆ¤(€€€€€€€€€€€€€€€€¹‰Õ¥± ¤ì(€€€€€€€µ½½±•M¥¹%¹±¥•¹Ð€ô½½±•M¥¹%¸¹•Ñ±¥•¹Ð¡Ñ¡¥Ì°Í¥¼¤ì((€€€€€€€½½±•M¥¹%¹1…Õ¹¡•È€ôÉ•¥ÍÑ•É½ÉÑ¥Ù¥ÑåI•ÍÕ±Ð (€€€€€€€€€€€€€€€¹•ÜÑ¥Ù¥ÑåI•ÍÕ±Ñ½¹ÑÉ…ÑÌ¹MÑ…ÉÑÑ¥Ù¥Ñå½ÉI•ÍÕ±Ð ¤°(€€€€€€€€€€€€€€€É•ÍÕ±Ð€´øì(€€€€€€€€€€€€€€€€€€€Q…Í¬ñ½½±•M¥¹%¹½Õ¹ÐøÑ…Í¬€ô½½±•M¥¹%¸¹•ÑM¥¹•‘%¹½Õ¹ÑÉ½µ%¹Ñ•¹Ð¡É•ÍÕ±Ð¹•Ñ…Ñ„ ¤¤ì(€€€€€€€€€€€€€€€€€€€¡…¹‘±•M¥¹%¹I•ÍÕ±Ð¡Ñ…Í¬¤ì(€€€€€€€€€€€€€€€ô(€€€€€€€€¤ì((€€€€€€€]•‰M•ÑÑ¥¹ÌÝÌ€ôÝ•‰Y¥•Ü¹•ÑM•ÑÑ¥¹Ì ¤ì(€€€€€€€ÝÌ¹Í•Ñ)…Ù…MÉ¥ÁÑ¹…‰±•¡ÑÉÕ”¤ì(€€€€€€€ÝÌ¹Í•Ñ½µMÑ½É…•¹…‰±•¡ÑÉÕ”¤ì(€€€€€€€ÝÌ¹Í•Ñ…Ñ…‰…Í•¹…‰±•¡ÑÉÕ”¤ì(€€€€€€€ÝÌ¹Í•Ñ5•‘¥…A±…å‰…­I•ÅÕ¥É•ÍUÍ•É•ÍÑÕÉ”¡™…±Í”¤ì(€€€€€€€ÝÌ¹Í•Ñ±±½Ý¥±••ÍÌ¡™…±Í”¤ì(€€€€€€€ÝÌ¹Í•Ñ±±½Ý½¹Ñ•¹Ñ•ÍÌ¡™…±Í”¤ì(€€€€€€€ÝÌ¹Í•Ñ…¡•5½‘”¡]•‰M•ÑÑ¥¹Ì¹1=}U1P¤ì(€€€€€€€ÝÌ¹Í•ÑUÍ•É•¹ÑMÑÉ¥¹œ¡ÝÌ¹•ÑUÍ•É•¹ÑMÑÉ¥¹œ ¤€¬€ˆ1¥µ•¹å•ÍÁÀ¼Ä¸Àˆ¤ì((€€€€€€€Ý•‰Y¥•Ü¹Í•Ñ1…å•ÉQåÁ”¡Y¥•Ü¹1eI}QeA}!I]I°¹Õ±°¤ì(€€€€€€€Ý•‰Y¥•Ü¹Í•Ñ	…­É½Õ¹‘½±½È¡½±½È¹Á…ÉÍ•½±½È ˆŒÁˆÁ˜ÄÜˆ¤¤ì((€€€€€€€€¼¼%¹Ñ•É™…è)…Ù…MÉ¥ÁÐA…É„±½¥¸¹…Ñ¥Ù¼‘”½½±”(€€€€€€€Ý•‰Y¥•Ü¹…‘‘)…Ù…MÉ¥ÁÑ%¹Ñ•É™…”¡¹•Ü]•‰ÁÁ%¹Ñ•É™…” ¤°€‰¹‘É½¥‘	É¥‘”ˆ¤ì((€€€€€€€½½­¥•5…¹…•È½½­¥•5…¹…•È€ô½½­¥•5…¹…•È¹•Ñ%¹ÍÑ…¹” ¤ì(€€€€€€€½½­¥•5…¹…•È¹Í•Ñ•ÁÑ½½­¥”¡ÑÉÕ”¤ì(€€€€€€€¥˜€¡	Õ¥±¹YIM%=8¹M-}%9P€øô	Õ¥±¹YIM%=9}=L¹1=11%A=@¤ì(€€€€€€€€€€€½½­¥•5…¹…•È¹Í•Ñ•ÁÑQ¡¥É‘A…ÉÑå½½­¥•Ì¡Ý•‰Y¥•Ü°ÑÉÕ”¤ì(€€€€€€€ô((€€€€€€€Ý•‰Y¥•Ü¹Í•Ñ]•‰Y¥•Ý±¥•¹Ð¡¹•Ü]•‰Y¥•Ý±¥•¹Ð ¤ì(€€€€€€€€€€€=Ù•ÉÉ¥‘”(€€€€€€€€€€€ÁÕ‰±¥ŒÙ½¥½¹A…•¥¹¥Í¡•¡]•‰Y¥•ÜÙ¥•Ü°MÑÉ¥¹œÕÉ°¤ì(€€€€€€€€€€€€€€€ÍÕÁ•È¹½¹A…•¥¹¥Í¡•¡Ù¥•Ü°ÕÉ°¤ì(€€€€€€€€€€€€€€€ÍÝ¥Á•1…å½ÕÐ¹Í•ÑI•™É•Í¡¥¹œ¡™…±Í”¤ì(€€€€€€€€€€€ô(€€€€€€€ô¤ì((€€€€€€€Ý•‰Y¥•Ü¹Í•Ñ]•‰¡É½µ•±¥•¹Ð¡¹•Ü]•‰¡É½µ•±¥•¹Ð ¤ì(€€€€€€€€€€€=Ù•ÉÉ¥‘”(€€€€€€€€€€€ÁÕ‰±¥ŒÙ½¥½¹A•Éµ¥ÍÍ¥½¹I•ÅÕ•ÍÐ¡™¥¹…°A•Éµ¥ÍÍ¥½¹I•ÅÕ•ÍÐÉ•ÅÕ•ÍÐ¤ì(€€€€€€€€€€€€€€€É•ÅÕ•ÍÐ¹É…¹Ð¡É•ÅÕ•ÍÐ¹•ÑI•Í½ÕÉ•Ì ¤¤ì(€€€€€€€€€€€ô(€€€€€€€ô¤ì((€€€€€€€Ý•‰Y¥•Ü¹±½…‘UÉ°¡AA}UI0¤ì(€€€ô((€€€ÁÕ‰±¥Œ±…ÍÌ]•‰ÁÁ%¹Ñ•É™…”ì(€€€€€€€)…Ù…MÉ¥ÁÑ%¹Ñ•É™…”(€€€€€€€ÁÕ‰±¥ŒÙ½¥ÍÑ…ÉÑ½½±•M¥¹%¸ ¤ì(€€€€€€€€€€€ÉÕ¹=¹U¥Q¡É•…  ¤€´øì(€€€€€€€€€€€€€€€%¹Ñ•¹ÐÍ¥¹%¹%¹Ñ•¹Ð€ôµ½½±•M¥¹%¹±¥•¹Ð¹•ÑM¥¹%¹%¹Ñ•¹Ð ¤ì(€€€€€€€€€€€€€€€½½±•M¥¹%¹1…Õ¹¡•È¹±…Õ¹ ¡Í¥¹%¹%¹Ñ•¹Ð¤ì(€€€€€€€€€€€ô¤ì(€€€€€€€ô((€€€€€€€)…Ù…MÉ¥ÁÑ%¹Ñ•É™…”(€€€€€€€ÁÕ‰±¥Œ‰½½±•…¸¥Í1…Ñ¥Ù•ÁÀ ¤ì(€€€€€€€€€€€É•ÑÕÉ¸ÑÉÕ”ì(€€€€€€€ô(€€€ô(((€€€ÁÉ¥Ù…Ñ”Ù½¥¡…¹‘±•M¥¹%¹I•ÍÕ±Ð¡Q…Í¬ñ½½±•M¥¹%¹½Õ¹Ðø½µÁ±•Ñ•‘Q…Í¬¤ì(€€€€€€€ÑÉäì(€€€€€€€€€€€½½±•M¥¹%¹½Õ¹Ð…½Õ¹Ð€ô½µÁ±•Ñ•‘Q…Í¬¹•ÑI•ÍÕ±Ð¡A%á•ÁÑ¥½¸¹±…ÍÌ¤ì(€€€€€€€€€€€¥˜€¡…½Õ¹Ð€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€)M=9=‰©•ÐÕÍ•É)Í½¸€ô¹•Ü)M=9=‰©•Ð ¤ì(€€€€€€€€€€€€€€€ÕÍ•É)Í½¸¹ÁÕÐ ‰•µ…¥°ˆ°…½Õ¹Ð¹•Ñµ…¥° ¤¤ì(€€€€€€€€€€€€€€€ÕÍ•É)Í½¸¹ÁÕÐ ‰‘¥ÍÁ±…å9…µ”ˆ°…½Õ¹Ð¹•Ñ¥ÍÁ±…å9…µ” ¤¤ì(€€€€€€€€€€€€€€€ÕÍ•É)Í½¸¹ÁÕÐ ‰¥ˆ°…½Õ¹Ð¹•Ñ% ¤¤ì(€€€€€€€€€€€€€€€ÕÍ•É)Í½¸¹ÁÕÐ ‰¥‘Q½­•¸ˆ°…½Õ¹Ð¹•Ñ%‘Q½­•¸ ¤¤ì((€€€€€€€€€€€€€€€MÑÉ¥¹œ©Ì€ôMÑÉ¥¹œ¹™½Éµ…Ð ‰Ý¥¹‘½Ü¹½¹9…Ñ¥Ù•½½±•M¥¹%¸ •Ì¤ìˆ°ÕÍ•É)Í½¸¹Ñ½MÑÉ¥¹œ ¤¤ì(€€€€€€€€€€€€€€€Ý•‰Y¥•Ü¹•Ù…±Õ…Ñ•)…Ù…MÉ¥ÁÐ¡©Ì°¹Õ±°¤ì(€€€€€€€€€€€ô(€€€€€€€ô…Ñ €¡á•ÁÑ¥½¸”¤ì(€€€€€€€€€€€1½œ¹”¡Q°€‰½½±”M¥¸µ%¸™…¥±•è€ˆ€¬”¹•Ñ5•ÍÍ…” ¤¤ì(€€€€€€€€€€€MÑÉ¥¹œ©ÍÉÈ€ôMÑÉ¥¹œ¹™½Éµ…Ð ‰Ý¥¹‘½Ü¹½¹9…Ñ¥Ù•½½±•M¥¹%¹…¥° œ•Ìœ¤ìˆ°”¹•Ñ5•ÍÍ…” ¤¤ì(€€€€€€€€€€€Ý•‰Y¥•Ü¹•Ù…±Õ…Ñ•)…Ù…MÉ¥ÁÐ¡©ÍÉÈ°¹Õ±°¤ì(€€€€€€€ô(€€€ô
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
+
+import org.json.JSONObject;
+
+public class MainActivity extends AppCompatActivity {
+
+    private WebView webView;
+    private SwipeRefreshLayout swipeLayout;
+    private static final String APP_URL = "https://eyes.limenseguridad.com/";
+    private static final String TAG = "LimenEyes";
+
+    private GoogleSignInClient mGoogleSignInClient;
+    private ActivityResultLauncher<Intent> googleSignInLauncher;
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        Window window = getWindow();
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.parseColor("#0b0f17"));
+        window.setNavigationBarColor(Color.parseColor("#0b0f17"));
+
+        setContentView(R.layout.activity_main);
+
+        swipeLayout = findViewById(R.id.swipeRefresh);
+        webView = findViewById(R.id.webView);
+
+        swipeLayout.setColorSchemeColors(Color.parseColor("#a855f7"));
+        swipeLayout.setProgressBackgroundColorSchemeColor(Color.parseColor("#151d2a"));
+        swipeLayout.setOnRefreshListener(() -> webView.reload());
+
+        // Google Sign-In Setup
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestId()
+                .requestProfile()
+                .requestIdToken("371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com")
+                .build();
+        mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
+
+        googleSignInLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
+                    handleSignInResult(task);
+                }
+        );
+
+        WebSettings ws = webView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setDatabaseEnabled(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setAllowFileAccess(false);
+        ws.setAllowContentAccess(false);
+        ws.setCacheMode(WebSettings.LOAD_DEFAULT);
+        ws.setUserAgentString(ws.getUserAgentString() + " LimenEyesApp/1.0");
+
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        webView.setBackgroundColor(Color.parseColor("#0b0f17"));
+
+        webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
+
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
+        }
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                swipeLayout.setRefreshing(false);
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                request.grant(request.getResources());
+            }
+        });
+
+        webView.loadUrl(APP_URL);
+    }
+
+    public class WebAppInterface {
+        @JavascriptInterface
+        public void startGoogleSignIn() {
+            runOnUiThread(() -> {
+                Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                googleSignInLauncher.launch(signInIntent);
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isNativeApp() {
+            return true;
+        }
+    }
+
+    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
+        try {
+            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+            if (account != null) {
+                JSONObject userJson = new JSONObject();
+                userJson.put("email", account.getEmail());
+                userJson.put("displayName", account.getDisplayName());
+                userJson.put("id", account.getId());
+                userJson.put("idToken", account.getIdToken());
+
+                String js = "window.onNativeGoogleSignIn(" + userJson.toString() + ");";
+                webView.evaluateJavascript(js, null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Google Sign-In failed: " + e.getMessage());
+            String safeMsg = e.getMessage() != null ? e.getMessage().replace("'", "\\'") : "Error desconocido";
+            String jsErr = "window.onNativeGoogleSignInFail('" + safeMsg + "');";
+            webView.evaluateJavascript(jsErr, null);
+        }
+    }
 
     @Override
     public void onBackPressed() {
