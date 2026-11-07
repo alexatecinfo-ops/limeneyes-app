@@ -37,21 +37,22 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.1.0 --yes || true
-        git push origin :refs/tags/v2.1.0 || true
+        gh release delete v2.2.0 --yes || true
+        git push origin :refs/tags/v2.2.0 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.1.0
+    - name: Create GitHub Release v2.2.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.1.0
-        name: "LIMEN EYES v2.1.0 - Native ExoPlayer Buffer Fix & Anti-Crash"
+        tag_name: v2.2.0
+        name: "LIMEN EYES v2.2.0 - Interfaz DMSS / EasyViewer, Home con Capturas 16:9 y Selección Manual"
         body: |
-          ### 📱 LIMEN EYES v2.1.0 - 100% App Nativa (Estable)
-          - **Corrección de crasheo al iniciar reproducción**: Se ajustaron los umbrales de `DefaultLoadControl` de Media3 ExoPlayer (`minBufferMs: 1500ms >= bufferForPlaybackAfterRebufferMs: 1000ms`), eliminando la excepción `IllegalArgumentException` al abrir las cámaras tras el login.
-          - **Grilla Nativa con LinearLayout de doble fila**: Reemplazo de `GridLayout.spec` por pesos nativos para 0 errores de layout.
-          - **Carga escalonada de decodificadores por hardware (`MediaCodec`)**.
+          ### 📱 LIMEN EYES v2.2.0 - Estética DMSS / EasyViewer Pro
+          - **Pantalla de Inicio (Home) con selección de dispositivo**: No inicia streams automáticamente al abrir la app.
+          - **Tarjetas por Dispositivo con Capturas 16:9**: Muestra la última imagen capturada de cada cámara con su etiqueta (`CAM 1`, `CAM 2`, etc.).
+          - **Reproductor en Vivo 16:9 bajo demanda**: Toca una cámara para verla en 16:9 individual, o toca el botón `(▶)` del dispositivo para abrir hasta 4 cámaras en simultáneo.
+          - **Soporte nativo H.265 (HEVC) + H.264**: Reproducción instantánea tanto en grabadores modernos (Fiorini) como clásicos (Novello).
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
