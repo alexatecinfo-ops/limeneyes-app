@@ -37,21 +37,23 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.3.0 --yes || true
-        git push origin :refs/tags/v2.3.0 || true
+        gh release delete v2.4.0 --yes || true
+        git push origin :refs/tags/v2.4.0 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.3.0
+    - name: Create GitHub Release v2.4.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.3.0
-        name: "LIMEN EYES v2.3.0 - Vistas 1CH / 4CH / 9CH, Filtro por Dispositivo e Iconografía Vectorial Limen"
+        tag_name: v2.4.0
+        name: "LIMEN EYES v2.4.0 - Detalles del Dispositivo, Modo Lista/Tarjetas, Consola en Vivo y Tipografía Uniforme Limen"
         body: |
-          ### 📱 LIMEN EYES v2.3.0 - Estética Oficial Limen
-          - **Vistas 1CH (1x1), 4CH (2x2) y 9CH (3x3)**: Alterna instantáneamente entre 1, 4 y 9 canales desde la barra de herramientas con iconos vectoriales dedicados.
-          - **Filtro estricto por Dispositivo/Cliente**: Al seleccionar un equipo (ej. *Fabian Novello*), la barra inferior y el selector de cámaras muestran **únicamente** los canales de ese equipo, sin mezclar cámaras de otros clientes. Incluye botón `Cambiar equipo ▾` por si deseas alternar sin salir al Inicio.
-          - **Iconografía Vectorial Oficial de Limen**: Reemplazados todos los emojis del sistema por iconos vectoriales limpios de trazo fino (`Feather/Lucide` de 2px) idénticos a Limen Admin y Mercury.
+          ### 📱 LIMEN EYES v2.4.0 - Experiencia EasyViewer con Identidad Limen Seguridad
+          - **Menú Flotante Limen en los 3 puntos (`•••`)**: Reemplazado el cuadro de diálogo genérico de Android por un panel oscuro flotante con iconos vectoriales y opción **Detalles del dispositivo**.
+          - **Pantalla "Detalles del dispositivo"**: Muestra chasis DVR/NVR, estado `En línea`, Modelo, `SN de dispositivo`, **Suscripción de alarma multicanal**, **Config. de transmisión (SD/HD)**, **Aceleración P2P / UPnP**, **Enlace DDNS / Limen Cloud** y **Configuración remota de canales**.
+          - **Alternador de Vista en Inicio (Tarjetas 16:9 vs. Lista Compacta)**: El icono superior izquierdo permite alternar entre las tarjetas con miniaturas 16:9 y la lista compacta de grabadores.
+          - **Vista en Vivo Rediseñada**: Cabecera con acceso directo a Detalles del dispositivo, overlays de canal y tasa de bits (`KB/s`), barra de 5 controles vectoriales (`Pausa`, `[SD/HD]`, `Audio`, `[1/4/9]`, `Pantalla completa`), consola táctil circular y bandeja desplegable de **Mensaje de alarma y eventos**.
+          - **Tipografía 100% uniforme**: Fuente y jerarquía visual unificadas en todas las pantallas y modales.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
