@@ -11,8 +11,8 @@ android {
         applicationId 'com.limenseguridad.limeneyes'
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName '1.4.0'
+        versionCode 5
+        versionName '2.0.0'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
@@ -32,10 +32,16 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.webkit:webkit:1.10.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 
-    // Firebase BoM
+    // Media3 ExoPlayer (Hardware-accelerated native H.264/HEVC decoding like EasyViewer/DMSS)
+    implementation 'androidx.media3:media3-exoplayer:1.3.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.3.1'
+    implementation 'androidx.media3:media3-exoplayer-rtsp:1.3.1'
+    implementation 'androidx.media3:media3-ui:1.3.1'
+
+    // Firebase & Native Google Sign-In
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.android.gms:play-services-auth:21.1.0'
 }
