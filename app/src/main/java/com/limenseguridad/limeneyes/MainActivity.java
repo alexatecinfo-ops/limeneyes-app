@@ -14,7 +14,6 @@ import android.text.InputType;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -22,7 +21,6 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -60,6 +58,8 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -93,12 +93,11 @@ public class MainActivity extends AppCompatActivity {
 
     private final List<CellHolder> cellHolders = new ArrayList<>();
     private int selectedCellIndex = 0;
-    private int fullscreenCellIndex = -1; // -1 = vista normal, >=0 = celda expandida
 
     private GoogleSignInClient googleSignInClient;
     private ActivityResultLauncher<Intent> googleSignInLauncher;
     private TextView statusErrorText;
-    private GridLayout videoGrid;
+    private LinearLayout rowTop, rowBottom;
     private LinearLayout clientFilterBar;
     private Button btnGrid1, btnGrid4, btnQuality;
 
@@ -129,57 +128,90 @@ public class MainActivity extends AppCompatActivity {
         public CameraItem activeCamera;
         public int activeSubtype = 1;
         public long lastTapTime = 0;
+        public int requestId = 0;
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Mantener pantalla encendida mientras se monitorean cámaras
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        Window window = getWindow();
-        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.parseColor("#0b0f17"));
-        window.setNavigationBarColor(Color.parseColor("#0b0f17"));
+        // Capturador global de excepciones para enviar telemetría y evitar cierre brusco sin rastro
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            reportCrashToServer("UncaughtException on " + thread.getName(), throwable);
+        });
 
-        setContentView(R.layout.activity_main);
-        rootContainer = findViewById(R.id.rootContainer);
-
-        // Registrar Google Sign-In Launcher de forma segura
         try {
-            googleSignInLauncher = registerForActivityResult(
-                    new ActivityResultContracts.StartActivityForResult(),
-                    result -> {
-                        try {
-                            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
-                            handleGoogleSignInResult(task);
-                        } catch (Throwable t) {
-                            showLoginError("Error al procesar cuenta de Google");
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            Window window = getWindow();
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.parseColor("#0b0f17"));
+            window.setNavigationBarColor(Color.parseColor("#0b0f17"));
+
+            setContentView(R.layout.activity_main);
+            rootContainer = findViewById(R.id.rootContainer);
+
+            try {
+                googleSignInLauncher = registerForActivityResult(
+                        new ActivityResultContracts.StartActivityForResult(),
+                        result -> {
+                            try {
+                                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
+                                handleGoogleSignInResult(task);
+                            } catch (Throwable t) {
+                                showLoginError("Error al procesar cuenta de Google");
+                            }
                         }
-                    }
-            );
+                );
 
-            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestEmail()
-                    .requestProfile()
-                    .build();
-            googleSignInClient = GoogleSignIn.getClient(this, gso);
+                GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestProfile()
+                        .build();
+                googleSignInClient = GoogleSignIn.getClient(this, gso);
+            } catch (Throwable t) {
+                Log.e(TAG, "GoogleSignIn init warning", t);
+            }
+
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            authToken = prefs.getString("token", "");
+            currentUserName = prefs.getString("userName", "");
+            currentUserEmail = prefs.getString("userEmail", "");
+            currentUserRole = prefs.getString("userRole", "");
+
+            if (authToken != null && !authToken.isEmpty()) {
+                showDashboardScreen();
+            } else {
+                showLoginScreen();
+            }
         } catch (Throwable t) {
-            Log.e(TAG, "GoogleSignIn init warning", t);
+            reportCrashToServer("onCreate fatal error", t);
         }
+    }
 
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        authToken = prefs.getString("token", "");
-        currentUserName = prefs.getString("userName", "");
-        currentUserEmail = prefs.getString("userEmail", "");
-        currentUserRole = prefs.getString("userRole", "");
+    private void reportCrashToServer(String context, Throwable t) {
+        try {
+            StringWriter sw = new StringWriter();
+            t.printStackTrace(new PrintWriter(sw));
+            final String stack = sw.toString();
+            Log.e(TAG, context + ": " + stack);
 
-        if (authToken != null && !authToken.isEmpty()) {
-            showDashboardScreen();
-        } else {
-            showLoginScreen();
-        }
+            new Thread(() -> {
+                try {
+                    JSONObject obj = new JSONObject();
+                    obj.put("context", context);
+                    obj.put("message", t.getMessage());
+                    obj.put("stack", stack);
+                    httpPostJson(BASE_URL + "/api/app-crash", obj.toString(), null);
+                } catch (Exception ignored) {}
+            }).start();
+
+            mainHandler.post(() -> Toast.makeText(
+                    MainActivity.this,
+                    "Aviso técnico: " + t.getClass().getSimpleName() + " - " + t.getMessage(),
+                    Toast.LENGTH_LONG
+            ).show());
+        } catch (Throwable ignored) {}
     }
 
     private int dp(int value) {
@@ -202,149 +234,148 @@ public class MainActivity extends AppCompatActivity {
     // 1. PANTALLA DE LOGIN NATIVA
     // =========================================================================
     private void showLoginScreen() {
-        releaseAllPlayers();
-        rootContainer.removeAllViews();
+        try {
+            releaseAllPlayers();
+            rootContainer.removeAllViews();
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.parseColor("#0b0f17"));
+            ScrollView scroll = new ScrollView(this);
+            scroll.setFillViewport(true);
+            scroll.setBackgroundColor(Color.parseColor("#0b0f17"));
 
-        LinearLayout wrapper = new LinearLayout(this);
-        wrapper.setOrientation(LinearLayout.VERTICAL);
-        wrapper.setGravity(Gravity.CENTER);
-        wrapper.setPadding(dp(24), dp(32), dp(24), dp(32));
+            LinearLayout wrapper = new LinearLayout(this);
+            wrapper.setOrientation(LinearLayout.VERTICAL);
+            wrapper.setGravity(Gravity.CENTER);
+            wrapper.setPadding(dp(24), dp(32), dp(24), dp(32));
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(26), dp(32), dp(26), dp(28));
-        card.setBackground(roundBg("#131b2e", 20, "#26324d", 1));
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        card.setLayoutParams(cardParams);
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(26), dp(32), dp(26), dp(28));
+            card.setBackground(roundBg("#131b2e", 20, "#26324d", 1));
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            card.setLayoutParams(cardParams);
 
-        // Icono & Título
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(R.mipmap.ic_launcher);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(72), dp(72));
-        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
-        logoParams.bottomMargin = dp(12);
-        card.addView(logo, logoParams);
+            ImageView logo = new ImageView(this);
+            logo.setImageResource(R.mipmap.ic_launcher);
+            LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+            logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+            logoParams.bottomMargin = dp(12);
+            card.addView(logo, logoParams);
 
-        TextView title = new TextView(this);
-        title.setText("LIMEN EYES");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(24);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setGravity(Gravity.CENTER);
-        card.addView(title);
+            TextView title = new TextView(this);
+            title.setText("LIMEN EYES");
+            title.setTextColor(Color.WHITE);
+            title.setTextSize(24);
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+            title.setGravity(Gravity.CENTER);
+            card.addView(title);
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Visor Nativo P2P de Alta Velocidad");
-        subtitle.setTextColor(Color.parseColor("#94a3b8"));
-        subtitle.setTextSize(13);
-        subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        subParams.bottomMargin = dp(22);
-        card.addView(subtitle, subParams);
+            TextView subtitle = new TextView(this);
+            subtitle.setText("Visor Nativo P2P de Alta Velocidad v2.1");
+            subtitle.setTextColor(Color.parseColor("#94a3b8"));
+            subtitle.setTextSize(13);
+            subtitle.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            subParams.bottomMargin = dp(22);
+            card.addView(subtitle, subParams);
 
-        statusErrorText = new TextView(this);
-        statusErrorText.setTextColor(Color.parseColor("#f87171"));
-        statusErrorText.setBackground(roundBg("#2c1519", 8, "#dc2626", 1));
-        statusErrorText.setPadding(dp(12), dp(10), dp(12), dp(10));
-        statusErrorText.setTextSize(13);
-        statusErrorText.setVisibility(View.GONE);
-        LinearLayout.LayoutParams errParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        errParams.bottomMargin = dp(16);
-        card.addView(statusErrorText, errParams);
+            statusErrorText = new TextView(this);
+            statusErrorText.setTextColor(Color.parseColor("#f87171"));
+            statusErrorText.setBackground(roundBg("#2c1519", 8, "#dc2626", 1));
+            statusErrorText.setPadding(dp(12), dp(10), dp(12), dp(10));
+            statusErrorText.setTextSize(13);
+            statusErrorText.setVisibility(View.GONE);
+            LinearLayout.LayoutParams errParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            errParams.bottomMargin = dp(16);
+            card.addView(statusErrorText, errParams);
 
-        // Input Usuario / Email
-        TextView lblUser = new TextView(this);
-        lblUser.setText("USUARIO O EMAIL AUTORIZADO");
-        lblUser.setTextColor(Color.parseColor("#94a3b8"));
-        lblUser.setTextSize(11);
-        lblUser.setTypeface(Typeface.DEFAULT_BOLD);
-        card.addView(lblUser);
+            TextView lblUser = new TextView(this);
+            lblUser.setText("USUARIO O EMAIL AUTORIZADO");
+            lblUser.setTextColor(Color.parseColor("#94a3b8"));
+            lblUser.setTextSize(11);
+            lblUser.setTypeface(Typeface.DEFAULT_BOLD);
+            card.addView(lblUser);
 
-        EditText inputUser = new EditText(this);
-        inputUser.setHint("Ej: admin o tu correo @gmail.com");
-        inputUser.setHintTextColor(Color.parseColor("#64748b"));
-        inputUser.setTextColor(Color.WHITE);
-        inputUser.setSingleLine(true);
-        inputUser.setBackground(roundBg("#0b0f17", 10, "#26324d", 1));
-        inputUser.setPadding(dp(14), dp(12), dp(14), dp(12));
-        LinearLayout.LayoutParams inUserParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inUserParams.topMargin = dp(6);
-        inUserParams.bottomMargin = dp(14);
-        card.addView(inputUser, inUserParams);
+            EditText inputUser = new EditText(this);
+            inputUser.setHint("Ej: admin o tu correo @gmail.com");
+            inputUser.setHintTextColor(Color.parseColor("#64748b"));
+            inputUser.setTextColor(Color.WHITE);
+            inputUser.setSingleLine(true);
+            inputUser.setBackground(roundBg("#0b0f17", 10, "#26324d", 1));
+            inputUser.setPadding(dp(14), dp(12), dp(14), dp(12));
+            LinearLayout.LayoutParams inUserParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            inUserParams.topMargin = dp(6);
+            inUserParams.bottomMargin = dp(14);
+            card.addView(inputUser, inUserParams);
 
-        // Input Contraseña
-        TextView lblPass = new TextView(this);
-        lblPass.setText("CONTRASEÑA");
-        lblPass.setTextColor(Color.parseColor("#94a3b8"));
-        lblPass.setTextSize(11);
-        lblPass.setTypeface(Typeface.DEFAULT_BOLD);
-        card.addView(lblPass);
+            TextView lblPass = new TextView(this);
+            lblPass.setText("CONTRASEÑA");
+            lblPass.setTextColor(Color.parseColor("#94a3b8"));
+            lblPass.setTextSize(11);
+            lblPass.setTypeface(Typeface.DEFAULT_BOLD);
+            card.addView(lblPass);
 
-        EditText inputPass = new EditText(this);
-        inputPass.setHint("Contraseña de Limen");
-        inputPass.setHintTextColor(Color.parseColor("#64748b"));
-        inputPass.setTextColor(Color.WHITE);
-        inputPass.setSingleLine(true);
-        inputPass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        inputPass.setBackground(roundBg("#0b0f17", 10, "#26324d", 1));
-        inputPass.setPadding(dp(14), dp(12), dp(14), dp(12));
-        LinearLayout.LayoutParams inPassParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inPassParams.topMargin = dp(6);
-        inPassParams.bottomMargin = dp(20);
-        card.addView(inputPass, inPassParams);
+            EditText inputPass = new EditText(this);
+            inputPass.setHint("Contraseña de Limen");
+            inputPass.setHintTextColor(Color.parseColor("#64748b"));
+            inputPass.setTextColor(Color.WHITE);
+            inputPass.setSingleLine(true);
+            inputPass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            inputPass.setBackground(roundBg("#0b0f17", 10, "#26324d", 1));
+            inputPass.setPadding(dp(14), dp(12), dp(14), dp(12));
+            LinearLayout.LayoutParams inPassParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            inPassParams.topMargin = dp(6);
+            inPassParams.bottomMargin = dp(20);
+            card.addView(inputPass, inPassParams);
 
-        // Botón Ingresar
-        Button btnLogin = new Button(this);
-        btnLogin.setText("INGRESAR AL SISTEMA");
-        btnLogin.setTextColor(Color.WHITE);
-        btnLogin.setTypeface(Typeface.DEFAULT_BOLD);
-        btnLogin.setAllCaps(false);
-        btnLogin.setBackground(roundBg("#9333ea", 10, null, 0));
-        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
-        );
-        btnParams.bottomMargin = dp(12);
-        btnLogin.setOnClickListener(v -> {
-            String u = inputUser.getText().toString().trim();
-            String p = inputPass.getText().toString().trim();
-            if (u.isEmpty() || p.isEmpty()) {
-                showLoginError("Ingresa usuario y contraseña");
-                return;
-            }
-            performStandardLogin(u, p, btnLogin);
-        });
-        card.addView(btnLogin, btnParams);
+            Button btnLogin = new Button(this);
+            btnLogin.setText("INGRESAR AL SISTEMA");
+            btnLogin.setTextColor(Color.WHITE);
+            btnLogin.setTypeface(Typeface.DEFAULT_BOLD);
+            btnLogin.setAllCaps(false);
+            btnLogin.setBackground(roundBg("#9333ea", 10, null, 0));
+            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+            );
+            btnParams.bottomMargin = dp(12);
+            btnLogin.setOnClickListener(v -> {
+                String u = inputUser.getText().toString().trim();
+                String p = inputPass.getText().toString().trim();
+                if (u.isEmpty() || p.isEmpty()) {
+                    showLoginError("Ingresa usuario y contraseña");
+                    return;
+                }
+                performStandardLogin(u, p, btnLogin);
+            });
+            card.addView(btnLogin, btnParams);
 
-        // Botón Google Sign-In Nativo
-        Button btnGoogle = new Button(this);
-        btnGoogle.setText("Continuar con Cuenta de Google");
-        btnGoogle.setTextColor(Color.parseColor("#0f172a"));
-        btnGoogle.setTypeface(Typeface.DEFAULT_BOLD);
-        btnGoogle.setAllCaps(false);
-        btnGoogle.setBackground(roundBg("#ffffff", 10, null, 0));
-        LinearLayout.LayoutParams googleParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
-        );
-        btnGoogle.setOnClickListener(v -> startNativeGoogleSignIn(inputUser.getText().toString().trim()));
-        card.addView(btnGoogle, googleParams);
+            Button btnGoogle = new Button(this);
+            btnGoogle.setText("Continuar con Cuenta de Google");
+            btnGoogle.setTextColor(Color.parseColor("#0f172a"));
+            btnGoogle.setTypeface(Typeface.DEFAULT_BOLD);
+            btnGoogle.setAllCaps(false);
+            btnGoogle.setBackground(roundBg("#ffffff", 10, null, 0));
+            LinearLayout.LayoutParams googleParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+            );
+            btnGoogle.setOnClickListener(v -> startNativeGoogleSignIn(inputUser.getText().toString().trim()));
+            card.addView(btnGoogle, googleParams);
 
-        wrapper.addView(card);
-        scroll.addView(wrapper);
-        rootContainer.addView(scroll);
+            wrapper.addView(card);
+            scroll.addView(wrapper);
+            rootContainer.addView(scroll);
+        } catch (Throwable t) {
+            reportCrashToServer("showLoginScreen error", t);
+        }
     }
 
     private void showLoginError(String msg) {
@@ -385,30 +416,33 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (ApiException e) {
             Log.w(TAG, "GoogleSignIn ApiException code=" + e.getStatusCode());
-            // Si falta SHA-1 en Firebase Console para este dispositivo, mostramos diálogo directo de validación Google
             promptGoogleEmailDialog();
         }
     }
 
     private void promptGoogleEmailDialog() {
-        EditText emailInput = new EditText(this);
-        emailInput.setHint("tu-correo@gmail.com");
-        emailInput.setSingleLine(true);
-        emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        emailInput.setPadding(dp(20), dp(16), dp(20), dp(16));
+        try {
+            EditText emailInput = new EditText(this);
+            emailInput.setHint("tu-correo@gmail.com");
+            emailInput.setSingleLine(true);
+            emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+            emailInput.setPadding(dp(20), dp(16), dp(20), dp(16));
 
-        new AlertDialog.Builder(this)
-                .setTitle("Validar Cuenta Google en Limen")
-                .setMessage("Ingresa tu correo registrado en Limen Admin para autorizar el acceso directo:")
-                .setView(emailInput)
-                .setPositiveButton("Validar", (d, w) -> {
-                    String email = emailInput.getText().toString().trim();
-                    if (!email.isEmpty()) {
-                        verifyGoogleEmailOnServer(email, email.split("@")[0]);
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
+            new AlertDialog.Builder(this)
+                    .setTitle("Validar Cuenta Google en Limen")
+                    .setMessage("Ingresa tu correo registrado en Limen Admin para autorizar el acceso directo:")
+                    .setView(emailInput)
+                    .setPositiveButton("Validar", (d, w) -> {
+                        String email = emailInput.getText().toString().trim();
+                        if (!email.isEmpty()) {
+                            verifyGoogleEmailOnServer(email, email.split("@")[0]);
+                        }
+                    })
+                    .setNegativeButton("Cancelar", null)
+                    .show();
+        } catch (Throwable t) {
+            reportCrashToServer("promptGoogleEmailDialog error", t);
+        }
     }
 
     private void verifyGoogleEmailOnServer(String email, String displayName) {
@@ -491,98 +525,108 @@ public class MainActivity extends AppCompatActivity {
     // 2. DASHBOARD NATIVO ESTILO EASYVIEWER / gDMSS
     // =========================================================================
     private void showDashboardScreen() {
-        releaseAllPlayers();
-        rootContainer.removeAllViews();
+        try {
+            releaseAllPlayers();
+            rootContainer.removeAllViews();
 
-        LinearLayout mainLayout = new LinearLayout(this);
-        mainLayout.setOrientation(LinearLayout.VERTICAL);
-        mainLayout.setBackgroundColor(Color.parseColor("#0b0f17"));
-        mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-        ));
+            LinearLayout mainLayout = new LinearLayout(this);
+            mainLayout.setOrientation(LinearLayout.VERTICAL);
+            mainLayout.setBackgroundColor(Color.parseColor("#0b0f17"));
+            mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            ));
 
-        // ── BARRA SUPERIOR (Header) ──
-        LinearLayout topBar = new LinearLayout(this);
-        topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setBackgroundColor(Color.parseColor("#131b2e"));
-        topBar.setPadding(dp(12), dp(10), dp(12), dp(10));
+            // ── BARRA SUPERIOR (Header) ──
+            LinearLayout topBar = new LinearLayout(this);
+            topBar.setOrientation(LinearLayout.HORIZONTAL);
+            topBar.setGravity(Gravity.CENTER_VERTICAL);
+            topBar.setBackgroundColor(Color.parseColor("#131b2e"));
+            topBar.setPadding(dp(12), dp(10), dp(12), dp(10));
 
-        TextView appTitle = new TextView(this);
-        appTitle.setText("LIMEN EYES");
-        appTitle.setTextColor(Color.WHITE);
-        appTitle.setTextSize(16);
-        appTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
-        );
-        topBar.addView(appTitle, titleParams);
+            TextView appTitle = new TextView(this);
+            appTitle.setText("LIMEN EYES");
+            appTitle.setTextColor(Color.WHITE);
+            appTitle.setTextSize(15);
+            appTitle.setTypeface(Typeface.DEFAULT_BOLD);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            );
+            topBar.addView(appTitle, titleParams);
 
-        // Botón Calidad SD / HD
-        btnQuality = createTopButton(currentSubtype == 1 ? "SD (Rápido)" : "HD (1080p)", "#1e293b");
-        btnQuality.setOnClickListener(v -> toggleStreamQuality());
-        topBar.addView(btnQuality);
+            btnQuality = createTopButton(currentSubtype == 1 ? "SD" : "HD", "#1e293b");
+            btnQuality.setOnClickListener(v -> toggleStreamQuality());
+            topBar.addView(btnQuality);
 
-        // Botón Vista 1x1
-        btnGrid1 = createTopButton("1x1", currentGridMode == 1 ? "#9333ea" : "#1e293b");
-        btnGrid1.setOnClickListener(v -> switchGridMode(1));
-        topBar.addView(btnGrid1);
+            btnGrid1 = createTopButton("1x1", currentGridMode == 1 ? "#9333ea" : "#1e293b");
+            btnGrid1.setOnClickListener(v -> switchGridMode(1));
+            topBar.addView(btnGrid1);
 
-        // Botón Vista 2x2 (4 cámaras)
-        btnGrid4 = createTopButton("2x2", currentGridMode == 4 ? "#9333ea" : "#1e293b");
-        btnGrid4.setOnClickListener(v -> switchGridMode(4));
-        topBar.addView(btnGrid4);
+            btnGrid4 = createTopButton("2x2", currentGridMode == 4 ? "#9333ea" : "#1e293b");
+            btnGrid4.setOnClickListener(v -> switchGridMode(4));
+            topBar.addView(btnGrid4);
 
-        // Botón Salir
-        Button btnExit = createTopButton("Salir", "#331a24");
-        btnExit.setOnClickListener(v -> logout());
-        topBar.addView(btnExit);
+            Button btnExit = createTopButton("Salir", "#331a24");
+            btnExit.setOnClickListener(v -> logout());
+            topBar.addView(btnExit);
 
-        mainLayout.addView(topBar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+            mainLayout.addView(topBar, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
 
-        // ── FILTRO DE CLIENTES / GRABADORES (Pills Horizontales) ──
-        HorizontalScrollView clientScroll = new HorizontalScrollView(this);
-        clientScroll.setHorizontalScrollBarEnabled(false);
-        clientScroll.setBackgroundColor(Color.parseColor("#0f1523"));
-        clientScroll.setPadding(dp(8), dp(6), dp(8), dp(6));
+            // ── FILTRO DE CLIENTES / GRABADORES (Pills Horizontales) ──
+            HorizontalScrollView clientScroll = new HorizontalScrollView(this);
+            clientScroll.setHorizontalScrollBarEnabled(false);
+            clientScroll.setBackgroundColor(Color.parseColor("#0f1523"));
+            clientScroll.setPadding(dp(8), dp(6), dp(8), dp(6));
 
-        clientFilterBar = new LinearLayout(this);
-        clientFilterBar.setOrientation(LinearLayout.HORIZONTAL);
-        clientScroll.addView(clientFilterBar);
-        mainLayout.addView(clientScroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+            clientFilterBar = new LinearLayout(this);
+            clientFilterBar.setOrientation(LinearLayout.HORIZONTAL);
+            clientScroll.addView(clientFilterBar);
+            mainLayout.addView(clientScroll, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
 
-        // ── GRILLA DE VIDEO NATIVO (SurfaceView / ExoPlayer) ──
-        videoGrid = new GridLayout(this);
-        videoGrid.setBackgroundColor(Color.BLACK);
-        LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        );
-        mainLayout.addView(videoGrid, gridParams);
+            // ── GRILLA DE VIDEO NATIVO (2 Filas LinearLayout con Weight 100% seguro) ──
+            LinearLayout gridContainer = new LinearLayout(this);
+            gridContainer.setOrientation(LinearLayout.VERTICAL);
+            gridContainer.setBackgroundColor(Color.BLACK);
+            LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            );
+            mainLayout.addView(gridContainer, gridParams);
 
-        // ── BARRA INFERIOR DE CANALES RÁPIDOS ──
-        HorizontalScrollView camBarScroll = new HorizontalScrollView(this);
-        camBarScroll.setHorizontalScrollBarEnabled(false);
-        camBarScroll.setBackgroundColor(Color.parseColor("#131b2e"));
-        camBarScroll.setPadding(dp(8), dp(8), dp(8), dp(8));
+            rowTop = new LinearLayout(this);
+            rowTop.setOrientation(LinearLayout.HORIZONTAL);
+            gridContainer.addView(rowTop, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            ));
 
-        LinearLayout bottomCamList = new LinearLayout(this);
-        bottomCamList.setOrientation(LinearLayout.HORIZONTAL);
-        camBarScroll.addView(bottomCamList);
-        mainLayout.addView(camBarScroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+            rowBottom = new LinearLayout(this);
+            rowBottom.setOrientation(LinearLayout.HORIZONTAL);
+            gridContainer.addView(rowBottom, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            ));
 
-        rootContainer.addView(mainLayout);
+            // ── BARRA INFERIOR DE CANALES RÁPIDOS ──
+            HorizontalScrollView camBarScroll = new HorizontalScrollView(this);
+            camBarScroll.setHorizontalScrollBarEnabled(false);
+            camBarScroll.setBackgroundColor(Color.parseColor("#131b2e"));
+            camBarScroll.setPadding(dp(8), dp(8), dp(8), dp(8));
 
-        // Construir las 4 celdas nativas de reproducción
-        buildVideoCells();
+            LinearLayout bottomCamList = new LinearLayout(this);
+            bottomCamList.setOrientation(LinearLayout.HORIZONTAL);
+            camBarScroll.addView(bottomCamList);
+            mainLayout.addView(camBarScroll, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
 
-        // Cargar lista de cámaras desde el servidor
-        fetchCamerasFromServer(bottomCamList);
+            rootContainer.addView(mainLayout);
+
+            buildVideoCells();
+            fetchCamerasFromServer(bottomCamList);
+        } catch (Throwable t) {
+            reportCrashToServer("showDashboardScreen error", t);
+        }
     }
 
     private Button createTopButton(String text, String bgHex) {
@@ -608,7 +652,8 @@ public class MainActivity extends AppCompatActivity {
     private void buildVideoCells() {
         releaseAllPlayers();
         cellHolders.clear();
-        videoGrid.removeAllViews();
+        rowTop.removeAllViews();
+        rowBottom.removeAllViews();
 
         for (int i = 0; i < 4; i++) {
             final int cellIdx = i;
@@ -618,7 +663,6 @@ public class MainActivity extends AppCompatActivity {
             FrameLayout cellFrame = new FrameLayout(this);
             cellFrame.setBackground(roundBg("#05070b", 0, cellIdx == selectedCellIndex ? "#a855f7" : "#1e293b", 2));
 
-            // PlayerView nativo con SurfaceView para decodificación directa por hardware
             PlayerView pv = new PlayerView(this);
             pv.setUseController(false);
             pv.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
@@ -627,18 +671,16 @@ public class MainActivity extends AppCompatActivity {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             ));
 
-            // Spinner de carga
             ProgressBar spinner = new ProgressBar(this);
             spinner.setVisibility(View.GONE);
-            FrameLayout.LayoutParams spinParams = new FrameLayout.LayoutParams(dp(36), dp(36));
+            FrameLayout.LayoutParams spinParams = new FrameLayout.LayoutParams(dp(34), dp(34));
             spinParams.gravity = Gravity.CENTER;
             cellFrame.addView(spinner, spinParams);
 
-            // Etiqueta de estado central ("Toca para abrir cámara")
             TextView lblStatus = new TextView(this);
             lblStatus.setText("+ Seleccionar Cámara " + (cellIdx + 1));
             lblStatus.setTextColor(Color.parseColor("#64748b"));
-            lblStatus.setTextSize(13);
+            lblStatus.setTextSize(12);
             lblStatus.setGravity(Gravity.CENTER);
             FrameLayout.LayoutParams stParams = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -646,7 +688,6 @@ public class MainActivity extends AppCompatActivity {
             stParams.gravity = Gravity.CENTER;
             cellFrame.addView(lblStatus, stParams);
 
-            // Overlay superior con nombre del canal y estado LIVE
             TextView lblTitle = new TextView(this);
             lblTitle.setText("Canal " + (cellIdx + 1));
             lblTitle.setTextColor(Color.WHITE);
@@ -659,11 +700,9 @@ public class MainActivity extends AppCompatActivity {
             tlParams.gravity = Gravity.TOP;
             cellFrame.addView(lblTitle, tlParams);
 
-            // Manejo de toque simple (seleccionar celda / elegir cámara) y doble toque (maximizar 1x1)
             cellFrame.setOnClickListener(v -> {
                 long now = System.currentTimeMillis();
                 if (now - holder.lastTapTime < 350) {
-                    // Doble tap: alternar pantalla completa de esta cámara
                     if (currentGridMode == 4) {
                         selectedCellIndex = cellIdx;
                         switchGridMode(1);
@@ -692,10 +731,18 @@ public class MainActivity extends AppCompatActivity {
             holder.labelTitle = lblTitle;
 
             cellHolders.add(holder);
-            videoGrid.addView(cellFrame);
+
+            LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f
+            );
+            if (i < 2) {
+                rowTop.addView(cellFrame, cellParams);
+            } else {
+                rowBottom.addView(cellFrame, cellParams);
+            }
         }
 
-        videoGrid.post(this::layoutGridCells);
+        applyGridVisibility();
     }
 
     private void selectCell(int idx) {
@@ -712,60 +759,39 @@ public class MainActivity extends AppCompatActivity {
         currentGridMode = mode;
         btnGrid1.setBackground(roundBg(mode == 1 ? "#9333ea" : "#1e293b", 6, "#334155", 1));
         btnGrid4.setBackground(roundBg(mode == 4 ? "#9333ea" : "#1e293b", 6, "#334155", 1));
-        layoutGridCells();
+        applyGridVisibility();
     }
 
-    private void layoutGridCells() {
-        if (videoGrid == null || cellHolders.isEmpty()) return;
-        int totalW = videoGrid.getWidth();
-        int totalH = videoGrid.getHeight();
-        if (totalW <= 0 || totalH <= 0) return;
-
+    private void applyGridVisibility() {
+        if (cellHolders.size() < 4 || rowTop == null || rowBottom == null) return;
         if (currentGridMode == 1) {
-            videoGrid.setColumnCount(1);
-            videoGrid.setRowCount(1);
-            for (int i = 0; i < cellHolders.size(); i++) {
-                CellHolder h = cellHolders.get(i);
-                if (i == selectedCellIndex) {
-                    h.container.setVisibility(View.VISIBLE);
-                    GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
-                            GridLayout.spec(0, 1), GridLayout.spec(0, 1)
-                    );
-                    lp.width = totalW;
-                    lp.height = totalH;
-                    h.container.setLayoutParams(lp);
-                } else {
-                    h.container.setVisibility(View.GONE);
-                }
+            if (selectedCellIndex < 2) {
+                rowTop.setVisibility(View.VISIBLE);
+                rowBottom.setVisibility(View.GONE);
+                cellHolders.get(0).container.setVisibility(selectedCellIndex == 0 ? View.VISIBLE : View.GONE);
+                cellHolders.get(1).container.setVisibility(selectedCellIndex == 1 ? View.VISIBLE : View.GONE);
+            } else {
+                rowTop.setVisibility(View.GONE);
+                rowBottom.setVisibility(View.VISIBLE);
+                cellHolders.get(2).container.setVisibility(selectedCellIndex == 2 ? View.VISIBLE : View.GONE);
+                cellHolders.get(3).container.setVisibility(selectedCellIndex == 3 ? View.VISIBLE : View.GONE);
             }
         } else {
-            videoGrid.setColumnCount(2);
-            videoGrid.setRowCount(2);
-            int cellW = totalW / 2;
-            int cellH = totalH / 2;
-            for (int i = 0; i < cellHolders.size(); i++) {
-                CellHolder h = cellHolders.get(i);
-                h.container.setVisibility(View.VISIBLE);
-                int row = i / 2;
-                int col = i % 2;
-                GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
-                        GridLayout.spec(row, 1), GridLayout.spec(col, 1)
-                );
-                lp.width = cellW;
-                lp.height = cellH;
-                h.container.setLayoutParams(lp);
+            rowTop.setVisibility(View.VISIBLE);
+            rowBottom.setVisibility(View.VISIBLE);
+            for (int i = 0; i < 4; i++) {
+                cellHolders.get(i).container.setVisibility(View.VISIBLE);
             }
         }
     }
 
     private void toggleStreamQuality() {
         currentSubtype = (currentSubtype == 1) ? 0 : 1;
-        btnQuality.setText(currentSubtype == 1 ? "SD (Rápido)" : "HD (1080p)");
+        btnQuality.setText(currentSubtype == 1 ? "SD" : "HD");
         Toast.makeText(this,
-                currentSubtype == 1 ? "Modo SD: Baja latencia y carga rápida" : "Modo HD: Máxima resolución",
+                currentSubtype == 1 ? "Modo SD: Carga rápida" : "Modo HD: Alta definición",
                 Toast.LENGTH_SHORT).show();
 
-        // Reconectar cámaras activas con la nueva calidad
         for (CellHolder h : cellHolders) {
             if (h.activeCamera != null) {
                 playCameraInCell(h.index, h.activeCamera);
@@ -796,16 +822,22 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 mainHandler.post(() -> {
-                    allCameras.clear();
-                    allCameras.addAll(loaded);
-                    populateClientFilterPills(bottomCamList);
-                    populateBottomCameraButtons(bottomCamList);
+                    try {
+                        allCameras.clear();
+                        allCameras.addAll(loaded);
+                        populateClientFilterPills(bottomCamList);
+                        populateBottomCameraButtons(bottomCamList);
 
-                    // Auto-cargar las primeras cámaras disponibles en la grilla
-                    List<CameraItem> filtered = getFilteredCameras();
-                    int limit = Math.min(filtered.size(), currentGridMode);
-                    for (int i = 0; i < limit; i++) {
-                        playCameraInCell(i, filtered.get(i));
+                        // Auto-cargar de manera escalonada las primeras cámaras para no saturar el decoder de hardware
+                        List<CameraItem> filtered = getFilteredCameras();
+                        int limit = Math.min(filtered.size(), 4);
+                        for (int i = 0; i < limit; i++) {
+                            final int cellIdx = i;
+                            final CameraItem cam = filtered.get(i);
+                            mainHandler.postDelayed(() -> playCameraInCell(cellIdx, cam), i * 350L);
+                        }
+                    } catch (Throwable t) {
+                        reportCrashToServer("fetchCameras post UI error", t);
                     }
                 });
             } catch (Exception e) {
@@ -863,11 +895,12 @@ public class MainActivity extends AppCompatActivity {
                 populateClientFilterPills(bottomCamList);
                 populateBottomCameraButtons(bottomCamList);
 
-                // Cargar en grilla las cámaras de este cliente inmediatamente
                 List<CameraItem> cams = getFilteredCameras();
                 for (int i = 0; i < 4; i++) {
                     if (i < cams.size()) {
-                        playCameraInCell(i, cams.get(i));
+                        final int idx = i;
+                        final CameraItem cam = cams.get(i);
+                        mainHandler.postDelayed(() -> playCameraInCell(idx, cam), i * 300L);
                     } else {
                         stopCellPlayer(i);
                     }
@@ -925,22 +958,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 3. MOTOR DE REPRODUCCIÓN NATIVO EXOPLAYER (Baja Latencia Hardware H.264)
+    // 3. MOTOR DE REPRODUCCIÓN NATIVO EXOPLAYER (Con Buffer Seguro)
     // =========================================================================
     private void playCameraInCell(int cellIdx, CameraItem cam) {
         if (cellIdx < 0 || cellIdx >= cellHolders.size()) return;
         CellHolder holder = cellHolders.get(cellIdx);
         holder.activeCamera = cam;
         holder.activeSubtype = currentSubtype;
+        final int currentReqId = ++holder.requestId;
 
         mainHandler.post(() -> {
-            holder.labelTitle.setText(cam.getDisplayTitle() + (currentSubtype == 1 ? " [SD]" : " [HD]"));
-            holder.labelStatus.setText("Conectando P2P...");
-            holder.labelStatus.setVisibility(View.VISIBLE);
-            holder.spinner.setVisibility(View.VISIBLE);
-            if (holder.player != null) {
-                holder.player.stop();
-                holder.player.clearMediaItems();
+            try {
+                holder.labelTitle.setText(cam.getDisplayTitle() + (currentSubtype == 1 ? " [SD]" : " [HD]"));
+                holder.labelStatus.setText("Conectando P2P...");
+                holder.labelStatus.setVisibility(View.VISIBLE);
+                holder.spinner.setVisibility(View.VISIBLE);
+                if (holder.player != null) {
+                    holder.player.stop();
+                    holder.player.clearMediaItems();
+                }
+            } catch (Throwable t) {
+                reportCrashToServer("playCameraInCell UI prep error", t);
             }
         });
 
@@ -957,22 +995,29 @@ public class MainActivity extends AppCompatActivity {
                         authToken
                 );
 
+                if (holder.requestId != currentReqId) return;
+
                 JSONObject data = new JSONObject(resp.body);
                 if (resp.code != 200 || !data.optBoolean("ok", false)) {
                     throw new Exception(data.optString("error", "No se pudo abrir el túnel P2P"));
                 }
 
                 String streamName = data.optString("stream", "");
-                // Stream fMP4 directo desde go2rtc para decodificación por hardware con mínima latencia
                 String mp4Url = BASE_URL + "/api/stream.mp4?src=" + Uri.encode(streamName);
 
-                mainHandler.post(() -> startNativeExoPlayer(holder, mp4Url));
+                mainHandler.post(() -> {
+                    if (holder.requestId == currentReqId) {
+                        startNativeExoPlayer(holder, mp4Url);
+                    }
+                });
             } catch (Exception e) {
                 Log.e(TAG, "Error activando stream P2P para cam " + cam.id, e);
                 mainHandler.post(() -> {
-                    holder.spinner.setVisibility(View.GONE);
-                    holder.labelStatus.setText("Sin señal (" + cam.nombre + ")\nToca para reintentar");
-                    holder.labelStatus.setVisibility(View.VISIBLE);
+                    if (holder.requestId == currentReqId) {
+                        holder.spinner.setVisibility(View.GONE);
+                        holder.labelStatus.setText("Sin señal (" + cam.nombre + ")\nToca para reintentar");
+                        holder.labelStatus.setVisibility(View.VISIBLE);
+                    }
                 });
             }
         });
@@ -981,13 +1026,13 @@ public class MainActivity extends AppCompatActivity {
     private void startNativeExoPlayer(CellHolder holder, String streamUrl) {
         try {
             if (holder.player == null) {
-                // Configuración ultra-baja latencia (< 500 ms buffer para monitoreo en tiempo real)
+                // Buffer válido y seguro en Media3 (evita IllegalArgumentException)
                 DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                         .setBufferDurationsMs(
-                                400,   // minBufferMs
-                                2000,  // maxBufferMs
-                                200,   // bufferForPlaybackMs
-                                400    // bufferForPlaybackAfterRebufferMs
+                                1500,  // minBufferMs
+                                5000,  // maxBufferMs
+                                500,   // bufferForPlaybackMs
+                                1000   // bufferForPlaybackAfterRebufferMs
                         )
                         .setPrioritizeTimeOverSizeThresholds(true)
                         .build();
@@ -1014,12 +1059,11 @@ public class MainActivity extends AppCompatActivity {
                         holder.spinner.setVisibility(View.GONE);
                         holder.labelStatus.setText("Reconectando stream...");
                         holder.labelStatus.setVisibility(View.VISIBLE);
-                        // Auto-reintento suave tras 2.5s si sigue asignada la cámara
                         mainHandler.postDelayed(() -> {
                             if (holder.activeCamera != null && !isFinishing()) {
                                 playCameraInCell(holder.index, holder.activeCamera);
                             }
-                        }, 2500);
+                        }, 3000);
                     }
                 });
 
@@ -1027,23 +1071,14 @@ public class MainActivity extends AppCompatActivity {
                 holder.playerView.setPlayer(player);
             }
 
-            MediaItem mediaItem = new MediaItem.Builder()
-                    .setUri(Uri.parse(streamUrl))
-                    .setLiveConfiguration(
-                            new MediaItem.LiveConfiguration.Builder()
-                                    .setMaxPlaybackSpeed(1.05f)
-                                    .setTargetOffsetMs(400)
-                                    .build()
-                    )
-                    .build();
-
+            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(streamUrl));
             holder.player.setMediaItem(mediaItem);
             holder.player.prepare();
             holder.player.setPlayWhenReady(true);
-        } catch (Exception e) {
-            Log.e(TAG, "Error iniciando ExoPlayer", e);
+        } catch (Throwable t) {
+            reportCrashToServer("startNativeExoPlayer error", t);
             holder.spinner.setVisibility(View.GONE);
-            holder.labelStatus.setText("Error de reproductor");
+            holder.labelStatus.setText("Error reproductor: " + t.getMessage());
             holder.labelStatus.setVisibility(View.VISIBLE);
         }
     }
@@ -1052,9 +1087,12 @@ public class MainActivity extends AppCompatActivity {
         if (cellIdx < 0 || cellIdx >= cellHolders.size()) return;
         CellHolder h = cellHolders.get(cellIdx);
         h.activeCamera = null;
+        h.requestId++;
         if (h.player != null) {
-            h.player.stop();
-            h.player.clearMediaItems();
+            try {
+                h.player.stop();
+                h.player.clearMediaItems();
+            } catch (Throwable ignored) {}
         }
         h.spinner.setVisibility(View.GONE);
         h.labelTitle.setText("Canal " + (cellIdx + 1));
@@ -1064,10 +1102,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void releaseAllPlayers() {
         for (CellHolder h : cellHolders) {
+            h.requestId++;
             if (h.player != null) {
                 try {
                     h.player.release();
-                } catch (Exception ignored) {}
+                } catch (Throwable ignored) {}
                 h.player = null;
             }
         }
@@ -1078,7 +1117,9 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         for (CellHolder h : cellHolders) {
             if (h.player != null) {
-                h.player.setPlayWhenReady(false);
+                try {
+                    h.player.setPlayWhenReady(false);
+                } catch (Throwable ignored) {}
             }
         }
     }
@@ -1088,7 +1129,9 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         for (CellHolder h : cellHolders) {
             if (h.player != null && h.activeCamera != null) {
-                h.player.setPlayWhenReady(true);
+                try {
+                    h.player.setPlayWhenReady(true);
+                } catch (Throwable ignored) {}
             }
         }
     }

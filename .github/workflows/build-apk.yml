@@ -37,23 +37,21 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.0.0 --yes || true
-        git push origin :refs/tags/v2.0.0 || true
+        gh release delete v2.1.0 --yes || true
+        git push origin :refs/tags/v2.1.0 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.0.0
+    - name: Create GitHub Release v2.1.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.0.0
-        name: "LIMEN EYES v2.0.0 - 100% Native Android (MediaCodec + ExoPlayer)"
+        tag_name: v2.1.0
+        name: "LIMEN EYES v2.1.0 - Native ExoPlayer Buffer Fix & Anti-Crash"
         body: |
-          ### 📱 LIMEN EYES v2.0.0 - 100% App Nativa (Sin WebView)
-          - **0% WebView**: Interfaz y motor de video 100% nativos en Android.
-          - **Decodificación por Hardware (`MediaCodec` + `ExoPlayer`)**: Reproducción de video H.264/HEVC directa sobre `SurfaceView` con baja latencia (< 400ms).
-          - **Grilla Multicanal (1x1 y 2x2)** estilo EasyViewer / gDMSS con doble toque para maximizar cámara.
-          - **Selector de Calidad SD / HD** en tiempo real.
-          - **Ingreso Nativo** con usuario Limen y validación directa de cuenta Google.
+          ### 📱 LIMEN EYES v2.1.0 - 100% App Nativa (Estable)
+          - **Corrección de crasheo al iniciar reproducción**: Se ajustaron los umbrales de `DefaultLoadControl` de Media3 ExoPlayer (`minBufferMs: 1500ms >= bufferForPlaybackAfterRebufferMs: 1000ms`), eliminando la excepción `IllegalArgumentException` al abrir las cámaras tras el login.
+          - **Grilla Nativa con LinearLayout de doble fila**: Reemplazo de `GridLayout.spec` por pesos nativos para 0 errores de layout.
+          - **Carga escalonada de decodificadores por hardware (`MediaCodec`)**.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
