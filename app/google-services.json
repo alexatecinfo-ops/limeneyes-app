@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "371253197557",
-    "project_id": "limby-2d1db",
-    "storage_bucket": "limby-2d1db.firebasestorage.app"
+    "project_number": "970239958936",
+    "project_id": "limen-eyes",
+    "storage_bucket": "limen-eyes.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:371253197557:android:efa11daf2ae017ac5963bc",
+        "mobilesdk_app_id": "1:970239958936:android:f9ba7d3a3f4f42487115ed",
         "android_client_info": {
-          "package_name": "com.limenseguridad.eyes"
+          "package_name": "com.limenseguridad.limeneyes"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBaJGhRrDXNhamUapi1wJmSAHyuXHe6o6s"
+          "current_key": "AIzaSyDtLm48g7x_jmt4y9HhITiIeFeuafBvWyM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "371253197557-ul15hk6bgr7ahism60f849d5tda7o6bl.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

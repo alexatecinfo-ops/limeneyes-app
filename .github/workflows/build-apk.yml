@@ -37,22 +37,22 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v1.3.0 --yes || true
-        git push origin :refs/tags/v1.3.0 || true
+        gh release delete v1.4.0 --yes || true
+        git push origin :refs/tags/v1.4.0 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v1.3.0
+    - name: Create GitHub Release v1.4.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.3.0
-        name: "LIMEN EYES v1.3.0 - Google & Firebase Auth"
+        tag_name: v1.4.0
+        name: "LIMEN EYES v1.4.0 - Firebase Config Actualizado & Inicio Estable"
         body: |
-          ### 📱 LIMEN EYES v1.3.0 - APK
-          - Ingreso nativo y autorización con **Google Sign-In** (Limby / Firebase).
-          - Vinculación directa con Limen Admin: permisos y cámaras autorizadas por usuario.
-          - Nombre oficial: **LIMEN EYES**.
-          - Logo y favdon neón pñrpura oficial.
+          ### 📱 LIMEN EYES v1.4.0 - APK
+          - Inicio 100% estable sin crasheos en launch.
+          - Paquete oficial configurado: `com.limenseguridad.limeneyes`.
+          - Google Services & Firebase actualizados para proyecto `limen-eyes`.
+          - Soporte de OAuth / Google Sign-In integrado.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:

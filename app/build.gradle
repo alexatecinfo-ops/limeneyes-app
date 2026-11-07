@@ -4,17 +4,17 @@ plugins {
 }
 
 android {
-    namespace 'com.limenseguridad.eyes'
+    namespace 'com.limenseguridad.limeneyes'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.limenseguridad.eyes"
+        applicationId 'com.limenseguridad.limeneyes'
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName "1.3.0"
+        versionCode 4
+        versionName '1.4.0'
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
     buildTypes {
@@ -35,9 +35,7 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.10.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 
-    // Firebase & Google Auth
-    implementation platform('com.google.firebase:firebase-bom:35.1.0')
+    // Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-analytics'
-    implementation 'com.google.firebase:firebase-auth'
-    implementation 'com.google.android.gms:play-services-auth:21.1.0'
 }
