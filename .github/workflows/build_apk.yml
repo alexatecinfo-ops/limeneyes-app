@@ -1,0 +1,58 @@
+name: Build LimenEyes APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant Execute Permission for Gradlew
+      run: chmod +x gradlew
+
+    - name: Build APK (Debug)
+      run: ./gradlew assembleDebug --stacktrace
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: LimenEyes-Debug-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Delete old release tag if exists
+      run: |
+        gh release delete v2.3.0 --yes || true
+        git push origin :refs/tags/v2.3.0 || true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release v2.3.0
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v2.3.0
+        name: "LIMEN EYES v2.3.0 - Vistas 1CH / 4CH / 9CH, Filtro por Dispositivo e Iconografía Vectorial Limen"
+        body: |
+          ### 📱 LIMEN EYES v2.3.0 - Estética Oficial Limen
+          - **Vistas 1CH (1x1), 4CH (2x2) y 9CH (3x3)**: Alterna instantáneamente entre 1, 4 y 9 canales desde la barra de herramientas con iconos vectoriales dedicados.
+          - **Filtro estricto por Dispositivo/Cliente**: Al seleccionar un equipo (ej. *Fabian Novello*), la barra inferior y el selector de cámaras muestran **únicamente** los canales de ese equipo, sin mezclar cámaras de otros clientes. Incluye botón `Cambiar equipo ▾` por si deseas alternar sin salir al Inicio.
+          - **Iconografía Vectorial Oficial de Limen**: Reemplazados todos los emojis del sistema por iconos vectoriales limpios de trazo fino (`Feather/Lucide` de 2px) idénticos a Limen Admin y Mercury.
+        files: |
+          app/build/outputs/apk/debug/app-debug.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

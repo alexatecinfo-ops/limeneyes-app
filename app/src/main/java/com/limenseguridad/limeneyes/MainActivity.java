@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
 
-    // Paleta de colores idéntica a DMSS / EasyViewer Pro (capturas subidas)
+    // Paleta oficial DMSS / Limen Dark
     private static final String COLOR_BG_MAIN      = "#14181F";
     private static final String COLOR_BG_CARD      = "#1E232D";
     private static final String COLOR_BG_INPUT     = "#242A36";
@@ -112,14 +112,18 @@ public class MainActivity extends AppCompatActivity {
     private int currentTab = 0;
 
     // Estado del Reproductor en Vivo (Live View)
-    private int currentGridMode = 4; // 1 = 1x1 (16:9), 4 = 2x2 (16:9)
+    private int currentGridMode = 4; // Soportados: 1 (1x1), 4 (2x2), 9 (3x3)
     private int currentSubtype = 1;  // 1 = SD (rápido), 0 = HD (alta definición)
     private int selectedCellIndex = 0;
     private boolean isMuted = true;
+    private String activeLiveGroupFilter = null; // Filtra los canales al dispositivo actual (ej: "Fabian Novello")
+
     private final List<CellHolder> cellHolders = new ArrayList<>();
-    private LinearLayout rowTop, rowBottom;
-    private TextView btnQualityBadge, btnGridBadge, btnMuteBadge;
+    private final List<LinearLayout> gridRows = new ArrayList<>();
+    private LimenIcons.IconView iconQualityView, iconGridView, iconMuteView;
+    private TextView txtQualityLabel, txtGridLabel;
     private TextView liveHeaderTitle;
+    private LinearLayout bottomChannelRow;
 
     private GoogleSignInClient googleSignInClient;
     private ActivityResultLauncher<Intent> googleSignInLauncher;
@@ -157,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
         public PlayerView playerView;
         public ExoPlayer player;
         public ImageView thumbPreview;
-        public TextView plusIcon;
+        public LimenIcons.IconView plusIcon;
         public TextView labelTitle;
         public TextView labelStatus;
         public ProgressBar spinner;
@@ -251,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 1. LOGIN SCREEN IDÉNTICO A DMSS / EASYVIEWER (Captura 1)
+    // 1. LOGIN SCREEN CON ICONOS VECTORIALES DE LIMEN
     // =========================================================================
     private void showLoginScreen() {
         releaseAllPlayers();
@@ -265,7 +269,6 @@ public class MainActivity extends AppCompatActivity {
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(dp(28), dp(64), dp(28), dp(32));
 
-        // Título "Iniciar sesión" alineado a la izquierda como en DMSS
         TextView title = new TextView(this);
         title.setText("Iniciar sesión");
         title.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
@@ -299,7 +302,7 @@ public class MainActivity extends AppCompatActivity {
         errLp.bottomMargin = dp(18);
         container.addView(statusErrorText, errLp);
 
-        // Campo Usuario / Email con botón (X) para limpiar
+        // Campo Usuario / Email con Icono Vectorial Limen CLOSE
         FrameLayout userWrap = new FrameLayout(this);
         userWrap.setBackground(roundBg(COLOR_BG_INPUT, 10, null, 0));
         LinearLayout.LayoutParams userWrapLp = new LinearLayout.LayoutParams(
@@ -320,20 +323,20 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        TextView clearBtn = new TextView(this);
-        clearBtn.setText("✕");
-        clearBtn.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-        clearBtn.setTextSize(13);
-        clearBtn.setGravity(Gravity.CENTER);
-        clearBtn.setBackground(circleBg("#323A4A", null, 0));
-        FrameLayout.LayoutParams clearLp = new FrameLayout.LayoutParams(dp(22), dp(22));
+        FrameLayout clearBtnWrap = new FrameLayout(this);
+        clearBtnWrap.setBackground(circleBg("#323A4A", null, 0));
+        LimenIcons.IconView clearIcon = new LimenIcons.IconView(this, LimenIcons.ICON_CLOSE, COLOR_TEXT_GRAY);
+        FrameLayout.LayoutParams ciLp = new FrameLayout.LayoutParams(dp(14), dp(14));
+        ciLp.gravity = Gravity.CENTER;
+        clearBtnWrap.addView(clearIcon, ciLp);
+        FrameLayout.LayoutParams clearLp = new FrameLayout.LayoutParams(dp(24), dp(24));
         clearLp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
         clearLp.rightMargin = dp(14);
-        clearBtn.setOnClickListener(v -> inputUser.setText(""));
-        userWrap.addView(clearBtn, clearLp);
+        clearBtnWrap.setOnClickListener(v -> inputUser.setText(""));
+        userWrap.addView(clearBtnWrap, clearLp);
         container.addView(userWrap, userWrapLp);
 
-        // Campo Contraseña con botón de mostrar/ocultar
+        // Campo Contraseña con Icono Vectorial Limen EYE
         FrameLayout passWrap = new FrameLayout(this);
         passWrap.setBackground(roundBg(COLOR_BG_INPUT, 10, null, 0));
         LinearLayout.LayoutParams passWrapLp = new LinearLayout.LayoutParams(
@@ -355,17 +358,14 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        TextView toggleEye = new TextView(this);
-        toggleEye.setText("👁");
-        toggleEye.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-        toggleEye.setTextSize(16);
-        toggleEye.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams eyeLp = new FrameLayout.LayoutParams(dp(36), dp(36));
+        LimenIcons.IconView eyeIcon = new LimenIcons.IconView(this, LimenIcons.ICON_EYE, COLOR_TEXT_GRAY);
+        FrameLayout.LayoutParams eyeLp = new FrameLayout.LayoutParams(dp(22), dp(22));
         eyeLp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        eyeLp.rightMargin = dp(10);
+        eyeLp.rightMargin = dp(16);
         final boolean[] passVisible = {false};
-        toggleEye.setOnClickListener(v -> {
+        eyeIcon.setOnClickListener(v -> {
             passVisible[0] = !passVisible[0];
+            eyeIcon.setIconColor(passVisible[0] ? COLOR_ACCENT_BLUE : COLOR_TEXT_GRAY);
             if (passVisible[0]) {
                 inputPass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
             } else {
@@ -373,10 +373,9 @@ public class MainActivity extends AppCompatActivity {
             }
             inputPass.setSelection(inputPass.getText().length());
         });
-        passWrap.addView(toggleEye, eyeLp);
+        passWrap.addView(eyeIcon, eyeLp);
         container.addView(passWrap, passWrapLp);
 
-        // Botón "Iniciar sesión" azul profundo estilo DMSS
         Button btnLogin = new Button(this);
         btnLogin.setText("Iniciar sesión");
         btnLogin.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
@@ -400,13 +399,11 @@ public class MainActivity extends AppCompatActivity {
         });
         container.addView(btnLogin, btnLp);
 
-        // Espaciador flexible para empujar "Iniciar sesión con" hacia abajo como en DMSS
         View spacer = new View(this);
         container.addView(spacer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ));
 
-        // Divisor "Iniciar sesión con"
         LinearLayout divRow = new LinearLayout(this);
         divRow.setOrientation(LinearLayout.HORIZONTAL);
         divRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -430,7 +427,6 @@ public class MainActivity extends AppCompatActivity {
         divRow.addView(line2, new LinearLayout.LayoutParams(0, dp(1), 1f));
         container.addView(divRow, divLp);
 
-        // Botón Circular G de Google centrado
         LinearLayout socialRow = new LinearLayout(this);
         socialRow.setOrientation(LinearLayout.HORIZONTAL);
         socialRow.setGravity(Gravity.CENTER);
@@ -626,11 +622,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 2. PANTALLA PRINCIPAL "INICIO" (HOME) IDÉNTICA A CAPTURA 3 DE DMSS
+    // 2. PANTALLA PRINCIPAL "INICIO" (HOME) CON ICONOS LIMEN Y CAPTURAS 16:9
     // =========================================================================
     private void showHomeScreen() {
         currentTab = 0;
-        // Importante: al estar en Home NO se inician cámaras en vivo automáticamente
         releaseAllPlayers();
         rootContainer.removeAllViews();
 
@@ -641,18 +636,15 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        // ── HEADER SUPERIOR: Icono Grilla | "Inicio" | (+) ──
+        // ── HEADER SUPERIOR: Icono Grid 4 | "Inicio" | Icono Refresh ──
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(16), dp(14), dp(16), dp(10));
 
-        TextView btnLiveShortcut = new TextView(this);
-        btnLiveShortcut.setText("⊞");
-        btnLiveShortcut.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-        btnLiveShortcut.setTextSize(22);
-        btnLiveShortcut.setOnClickListener(v -> showLiveViewScreen(null, null));
-        header.addView(btnLiveShortcut);
+        LimenIcons.IconView btnLiveShortcut = new LimenIcons.IconView(this, LimenIcons.ICON_GRID_4, COLOR_TEXT_WHITE);
+        btnLiveShortcut.setOnClickListener(v -> showLiveViewScreen(null, null, null));
+        header.addView(btnLiveShortcut, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
         TextView headerTitle = new TextView(this);
         headerTitle.setText("Inicio");
@@ -662,12 +654,9 @@ public class MainActivity extends AppCompatActivity {
         headerTitle.setGravity(Gravity.CENTER);
         header.addView(headerTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView btnRefresh = new TextView(this);
-        btnRefresh.setText("↻");
-        btnRefresh.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-        btnRefresh.setTextSize(20);
+        LimenIcons.IconView btnRefresh = new LimenIcons.IconView(this, LimenIcons.ICON_REFRESH, COLOR_TEXT_WHITE);
         btnRefresh.setOnClickListener(v -> loadCamerasAndOpenHome());
-        header.addView(btnRefresh);
+        header.addView(btnRefresh, new LinearLayout.LayoutParams(dp(22), dp(22)));
 
         page.addView(header);
 
@@ -678,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(14), dp(6), dp(14), dp(20));
 
-        // Barra de búsqueda redondeada oscura
+        // Barra de búsqueda con icono vectorial Limen SEARCH
         LinearLayout searchBox = new LinearLayout(this);
         searchBox.setOrientation(LinearLayout.HORIZONTAL);
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
@@ -689,11 +678,8 @@ public class MainActivity extends AppCompatActivity {
         );
         searchLp.bottomMargin = dp(14);
 
-        TextView searchIcon = new TextView(this);
-        searchIcon.setText("🔍 ");
-        searchIcon.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-        searchIcon.setTextSize(13);
-        searchBox.addView(searchIcon);
+        LimenIcons.IconView searchIcon = new LimenIcons.IconView(this, LimenIcons.ICON_SEARCH, COLOR_TEXT_GRAY);
+        searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(16), dp(16)));
 
         EditText searchInput = new EditText(this);
         searchInput.setHint("Buscar dispositivo o cámara...");
@@ -703,12 +689,12 @@ public class MainActivity extends AppCompatActivity {
         searchInput.setSingleLine(true);
         searchInput.setText(searchQuery);
         searchInput.setBackgroundColor(Color.TRANSPARENT);
-        searchInput.setPadding(dp(6), 0, dp(6), 0);
+        searchInput.setPadding(dp(10), 0, dp(6), 0);
         searchBox.addView(searchInput, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
 
         content.addView(searchBox, searchLp);
 
-        // ── BARRA DE ACCIONES RÁPIDAS (Vista previa, Playback, Dispositivos, Alarma) ──
+        // ── BARRA DE ACCIONES RÁPIDAS CON ICONOS VECTORIALES DE LIMEN ──
         LinearLayout quickCard = new LinearLayout(this);
         quickCard.setOrientation(LinearLayout.HORIZONTAL);
         quickCard.setBackground(roundBg(COLOR_BG_CARD, 14, null, 0));
@@ -718,19 +704,19 @@ public class MainActivity extends AppCompatActivity {
         );
         quickLp.bottomMargin = dp(14);
 
-        quickCard.addView(createQuickActionItem("📹", "#2E82FF", "Vista previa", () -> showLiveViewScreen(null, null)));
-        quickCard.addView(createQuickActionItem("🎞", "#0EA5E9", "Multicanal", () -> {
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_VIDEO, "#2E82FF", "Vista previa", () -> showLiveViewScreen(null, null, null)));
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_4, "#0EA5E9", "Vista 4 CH", () -> {
             currentGridMode = 4;
-            showLiveViewScreen(null, null);
+            showLiveViewScreen(null, null, null);
         }));
-        quickCard.addView(createQuickActionItem("🖧", "#6366F1", "Dispositivos", this::showDeviceManagerScreen));
-        quickCard.addView(createQuickActionItem("🔔", "#8B5CF6", "Estado P2P", () -> {
-            Toast.makeText(this, "Motor P2P Activo · " + allCameras.size() + " canales autorizados", Toast.LENGTH_SHORT).show();
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_9, "#6366F1", "Vista 9 CH", () -> {
+            currentGridMode = 9;
+            showLiveViewScreen(null, null, null);
         }));
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_SERVER, "#8B5CF6", "Dispositivos", this::showDeviceManagerScreen));
 
         content.addView(quickCard, quickLp);
 
-        // Contenedor de tarjetas de dispositivos (DVRs / Clientes)
         LinearLayout devicesContainer = new LinearLayout(this);
         devicesContainer.setOrientation(LinearLayout.VERTICAL);
         content.addView(devicesContainer);
@@ -751,27 +737,27 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ));
 
-        // ── BARRA DE NAVEGACIÓN INFERIOR (Inicio | Dispositivos | Me) ──
         page.addView(buildBottomNavBar());
         rootContainer.addView(page);
     }
 
-    private View createQuickActionItem(String symbol, String colorHex, String label, Runnable onClick) {
+    private View createQuickActionItem(int iconType, String colorHex, String label, Runnable onClick) {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER);
         col.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         col.setOnClickListener(v -> onClick.run());
 
-        TextView icon = new TextView(this);
-        icon.setText(symbol);
-        icon.setTextSize(18);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(circleBg(colorHex, null, 0));
-        icon.setTextColor(Color.WHITE);
+        FrameLayout circle = new FrameLayout(this);
+        circle.setBackground(circleBg(colorHex, null, 0));
+        LimenIcons.IconView iv = new LimenIcons.IconView(this, iconType, "#FFFFFF");
+        FrameLayout.LayoutParams ivLp = new FrameLayout.LayoutParams(dp(20), dp(20));
+        ivLp.gravity = Gravity.CENTER;
+        circle.addView(iv, ivLp);
+
         LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(42), dp(42));
         icLp.bottomMargin = dp(6);
-        col.addView(icon, icLp);
+        col.addView(circle, icLp);
 
         TextView txt = new TextView(this);
         txt.setText(label);
@@ -797,7 +783,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Agrupar cámaras por Dispositivo / Cliente (como las tarjetas "cams", "foo", "gom" en DMSS)
         Map<String, List<CameraItem>> groups = new LinkedHashMap<>();
         String q = filter != null ? filter.toLowerCase() : "";
 
@@ -817,11 +802,11 @@ public class MainActivity extends AppCompatActivity {
 
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         int thumbWidth = (screenWidth - dp(68)) / 2;
-        int thumbHeight = (thumbWidth * 9) / 16; // Formato exacto 16:9
+        int thumbHeight = (thumbWidth * 9) / 16; // Relación 16:9
 
         for (Map.Entry<String, List<CameraItem>> entry : groups.entrySet()) {
-            String groupTitle = entry.getKey();
-            List<CameraItem> cams = entry.getValue();
+            final String groupTitle = entry.getKey();
+            final List<CameraItem> cams = entry.getValue();
 
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
@@ -832,7 +817,6 @@ public class MainActivity extends AppCompatActivity {
             );
             cardLp.bottomMargin = dp(14);
 
-            // Cabecera de la tarjeta: Nombre del dispositivo + Botón (▶) para abrir grupo + (•••)
             LinearLayout topRow = new LinearLayout(this);
             topRow.setOrientation(LinearLayout.HORIZONTAL);
             topRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -848,32 +832,29 @@ public class MainActivity extends AppCompatActivity {
             titleTv.setTypeface(Typeface.DEFAULT_BOLD);
             topRow.addView(titleTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            // Botón Play circular (▶) para abrir hasta 4 cámaras de este equipo en la vista 2x2
-            TextView playGroupBtn = new TextView(this);
-            playGroupBtn.setText("▶");
-            playGroupBtn.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-            playGroupBtn.setTextSize(12);
-            playGroupBtn.setGravity(Gravity.CENTER);
+            // Botón Play circular con icono vectorial Limen PLAY
+            FrameLayout playGroupBtn = new FrameLayout(this);
             playGroupBtn.setBackground(circleBg("#283142", "#94A3B8", 1));
+            LimenIcons.IconView playIcon = new LimenIcons.IconView(this, LimenIcons.ICON_PLAY, COLOR_TEXT_WHITE);
+            FrameLayout.LayoutParams piLp = new FrameLayout.LayoutParams(dp(13), dp(13));
+            piLp.gravity = Gravity.CENTER;
+            playGroupBtn.addView(playIcon, piLp);
+
             LinearLayout.LayoutParams playBtnLp = new LinearLayout.LayoutParams(dp(28), dp(28));
             playBtnLp.rightMargin = dp(10);
             playGroupBtn.setOnClickListener(v -> {
-                currentGridMode = cams.size() > 1 ? 4 : 1;
-                showLiveViewScreen(null, cams);
+                // Si el DVR tiene más de 4 cámaras (ej. Novello con 8), abre vista 9 CH o 4 CH filtrada a ese cliente
+                currentGridMode = cams.size() > 4 ? 9 : (cams.size() > 1 ? 4 : 1);
+                showLiveViewScreen(null, cams, groupTitle);
             });
             topRow.addView(playGroupBtn, playBtnLp);
 
-            TextView moreBtn = new TextView(this);
-            moreBtn.setText("•••");
-            moreBtn.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-            moreBtn.setTextSize(14);
-            moreBtn.setPadding(dp(4), dp(2), dp(4), dp(2));
+            LimenIcons.IconView moreBtn = new LimenIcons.IconView(this, LimenIcons.ICON_MORE_H, COLOR_TEXT_GRAY);
             moreBtn.setOnClickListener(v -> showDeviceChannelSelectorModal(groupTitle, cams));
-            topRow.addView(moreBtn);
+            topRow.addView(moreBtn, new LinearLayout.LayoutParams(dp(22), dp(22)));
 
             card.addView(topRow, topRowLp);
 
-            // Carrusel horizontal de miniaturas 16:9 con la última captura de cada cámara
             HorizontalScrollView thumbScroll = new HorizontalScrollView(this);
             thumbScroll.setHorizontalScrollBarEnabled(false);
 
@@ -889,28 +870,24 @@ public class MainActivity extends AppCompatActivity {
                 if (i < cams.size() - 1) tcLp.rightMargin = dp(10);
                 thumbCard.setLayoutParams(tcLp);
 
-                // Imagen de la última captura (16:9)
                 ImageView img = new ImageView(this);
                 img.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 thumbCard.addView(img, new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                 ));
 
-                // Cargar última captura guardada en caché local o desde el servidor sin iniciar stream de video
                 loadCameraThumbnailAsync(cam.id, img);
 
-                // Icono central sutil de Play sobre la captura
-                TextView playOverlay = new TextView(this);
-                playOverlay.setText("▶");
-                playOverlay.setTextColor(Color.WHITE);
-                playOverlay.setTextSize(13);
-                playOverlay.setGravity(Gravity.CENTER);
+                FrameLayout playOverlay = new FrameLayout(this);
                 playOverlay.setBackground(circleBg("#88000000", "#88FFFFFF", 1));
+                LimenIcons.IconView poIcon = new LimenIcons.IconView(this, LimenIcons.ICON_PLAY, "#FFFFFF");
+                FrameLayout.LayoutParams poiLp = new FrameLayout.LayoutParams(dp(14), dp(14));
+                poiLp.gravity = Gravity.CENTER;
+                playOverlay.addView(poIcon, poiLp);
                 FrameLayout.LayoutParams poLp = new FrameLayout.LayoutParams(dp(32), dp(32));
                 poLp.gravity = Gravity.CENTER;
                 thumbCard.addView(playOverlay, poLp);
 
-                // Degradado inferior con el nombre del canal ("CAM 1", "CAM 2")
                 TextView camLabel = new TextView(this);
                 camLabel.setText(cam.getShortChannelLabel());
                 camLabel.setTextColor(Color.WHITE);
@@ -926,10 +903,10 @@ public class MainActivity extends AppCompatActivity {
                 clLp.gravity = Gravity.BOTTOM;
                 thumbCard.addView(camLabel, clLp);
 
-                // Al tocar una cámara individual: abre el visor en vivo 16:9 (1x1) solo con esa cámara
+                // Al tocar una cámara individual de p.ej. Fabian Novello, pasa el filtro "Fabian Novello" para que abajo solo salgan las cámaras de Novello
                 thumbCard.setOnClickListener(v -> {
                     currentGridMode = 1;
-                    showLiveViewScreen(cam, null);
+                    showLiveViewScreen(cam, null, groupTitle);
                 });
 
                 thumbRow.addView(thumbCard);
@@ -938,7 +915,6 @@ public class MainActivity extends AppCompatActivity {
             thumbScroll.addView(thumbRow);
             card.addView(thumbScroll);
 
-            // Pie de tarjeta: Punto azul + "Dispositivo P2P conectado · X canales"
             LinearLayout footerRow = new LinearLayout(this);
             footerRow.setOrientation(LinearLayout.HORIZONTAL);
             footerRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -965,10 +941,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 3. VISOR EN VIVO 16:9 (LIVE VIEW) IDÉNTICO A EASYVIEWER / DMSS (Capturas 2 y 7)
+    // 3. VISOR EN VIVO 16:9 (1CH, 4CH y 9CH) CON FILTRO ESTRICTO POR DISPOSITIVO
     // =========================================================================
-    private void showLiveViewScreen(CameraItem singleCamToStart, List<CameraItem> groupCamsToStart) {
+    private List<CameraItem> getCamerasForCurrentLiveFilter() {
+        if (activeLiveGroupFilter == null || activeLiveGroupFilter.isEmpty()) {
+            return new ArrayList<>(allCameras);
+        }
+        List<CameraItem> out = new ArrayList<>();
+        for (CameraItem c : allCameras) {
+            if (activeLiveGroupFilter.equalsIgnoreCase(c.getGroupTitle())) {
+                out.add(c);
+            }
+        }
+        return out.isEmpty() ? new ArrayList<>(allCameras) : out;
+    }
+
+    private void showLiveViewScreen(CameraItem singleCamToStart, List<CameraItem> groupCamsToStart, String groupFilter) {
         currentTab = 1;
+        if (groupFilter != null) {
+            activeLiveGroupFilter = groupFilter;
+        } else if (singleCamToStart != null) {
+            activeLiveGroupFilter = singleCamToStart.getGroupTitle();
+        } else if (groupCamsToStart != null && !groupCamsToStart.isEmpty()) {
+            activeLiveGroupFilter = groupCamsToStart.get(0).getGroupTitle();
+        } else {
+            activeLiveGroupFilter = null;
+        }
+
         releaseAllPlayers();
         rootContainer.removeAllViews();
 
@@ -979,46 +978,53 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        // ── BARRA SUPERIOR DE LIVE VIEW: (🏠 Home) | Título Dispositivo | (☰ Elegir Cámara) ──
+        // ── BARRA SUPERIOR DE LIVE VIEW CON ICONOS LIMEN ──
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setBackgroundColor(Color.parseColor(COLOR_BG_CARD));
         topBar.setPadding(dp(14), dp(12), dp(14), dp(12));
 
-        TextView btnBackHome = new TextView(this);
-        btnBackHome.setText("⌂  Inicio");
-        btnBackHome.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-        btnBackHome.setTextSize(15);
-        btnBackHome.setTypeface(Typeface.DEFAULT_BOLD);
-        btnBackHome.setOnClickListener(v -> showHomeScreen());
-        topBar.addView(btnBackHome);
+        LinearLayout btnBackWrap = new LinearLayout(this);
+        btnBackWrap.setOrientation(LinearLayout.HORIZONTAL);
+        btnBackWrap.setGravity(Gravity.CENTER_VERTICAL);
+        LimenIcons.IconView homeIco = new LimenIcons.IconView(this, LimenIcons.ICON_HOME, COLOR_TEXT_WHITE);
+        btnBackWrap.addView(homeIco, new LinearLayout.LayoutParams(dp(18), dp(18)));
+        TextView btnBackText = new TextView(this);
+        btnBackText.setText("  Inicio");
+        btnBackText.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+        btnBackText.setTextSize(14);
+        btnBackText.setTypeface(Typeface.DEFAULT_BOLD);
+        btnBackWrap.addView(btnBackText);
+        btnBackWrap.setOnClickListener(v -> showHomeScreen());
+        topBar.addView(btnBackWrap);
 
         liveHeaderTitle = new TextView(this);
-        if (singleCamToStart != null) {
-            liveHeaderTitle.setText(singleCamToStart.getGroupTitle());
-        } else if (groupCamsToStart != null && !groupCamsToStart.isEmpty()) {
-            liveHeaderTitle.setText(groupCamsToStart.get(0).getGroupTitle());
-        } else {
-            liveHeaderTitle.setText("Vista en Vivo");
-        }
+        liveHeaderTitle.setText(activeLiveGroupFilter != null ? activeLiveGroupFilter : "Vista en Vivo");
         liveHeaderTitle.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
         liveHeaderTitle.setTextSize(16);
         liveHeaderTitle.setTypeface(Typeface.DEFAULT_BOLD);
         liveHeaderTitle.setGravity(Gravity.CENTER);
         topBar.addView(liveHeaderTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        // Botón para cambiar de Dispositivo o elegir Cámara
+        LinearLayout btnSwitchDev = new LinearLayout(this);
+        btnSwitchDev.setOrientation(LinearLayout.HORIZONTAL);
+        btnSwitchDev.setGravity(Gravity.CENTER_VERTICAL);
+        LimenIcons.IconView camIco = new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, COLOR_ACCENT_BLUE);
+        btnSwitchDev.addView(camIco, new LinearLayout.LayoutParams(dp(18), dp(18)));
         TextView btnSelectCamTop = new TextView(this);
-        btnSelectCamTop.setText("☰ Cámaras");
+        btnSelectCamTop.setText(" Canales");
         btnSelectCamTop.setTextColor(Color.parseColor(COLOR_ACCENT_BLUE));
-        btnSelectCamTop.setTextSize(14);
+        btnSelectCamTop.setTextSize(13);
         btnSelectCamTop.setTypeface(Typeface.DEFAULT_BOLD);
-        btnSelectCamTop.setOnClickListener(v -> showCameraPickerDialog(selectedCellIndex));
-        topBar.addView(btnSelectCamTop);
+        btnSwitchDev.addView(btnSelectCamTop);
+        btnSwitchDev.setOnClickListener(v -> showCameraPickerDialog(selectedCellIndex));
+        topBar.addView(btnSwitchDev);
 
         page.addView(topBar);
 
-        // ── ESCENARIO DE VIDEO 16:9 CENTRADO ──
+        // ── ESCENARIO DE VIDEO 16:9 CENTRADO (Soporta 1x1, 2x2 y 3x3 = 9 canales) ──
         FrameLayout videoStageWrap = new FrameLayout(this);
         videoStageWrap.setBackgroundColor(Color.BLACK);
         LinearLayout.LayoutParams stageLp = new LinearLayout.LayoutParams(
@@ -1035,123 +1041,118 @@ public class MainActivity extends AppCompatActivity {
         gridLp.gravity = Gravity.CENTER;
         videoStageWrap.addView(gridContainer, gridLp);
 
-        rowTop = new LinearLayout(this);
-        rowTop.setOrientation(LinearLayout.HORIZONTAL);
-        gridContainer.addView(rowTop, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ));
+        gridRows.clear();
+        for (int r = 0; r < 3; r++) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            gridContainer.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            ));
+            gridRows.add(row);
+        }
 
-        rowBottom = new LinearLayout(this);
-        rowBottom.setOrientation(LinearLayout.HORIZONTAL);
-        gridContainer.addView(rowBottom, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ));
+        buildLiveCells9();
 
-        buildLiveCells16x9();
-
-        // ── BARRA DE CONTROLES DEL REPRODUCTOR (Estilo Captura 2 y 7: Play/Pause, SD/HD, Audio, 1x1/2x2, Cerrar) ──
+        // ── BARRA DE CONTROLES DEL REPRODUCTOR CON ICONOS VECTORIALES LIMEN ──
         LinearLayout controlBar = new LinearLayout(this);
         controlBar.setOrientation(LinearLayout.HORIZONTAL);
         controlBar.setGravity(Gravity.CENTER_VERTICAL);
         controlBar.setBackgroundColor(Color.parseColor(COLOR_BG_CARD));
-        controlBar.setPadding(dp(8), dp(10), dp(8), dp(10));
+        controlBar.setPadding(dp(6), dp(8), dp(6), dp(8));
 
-        // 1. Play / Recargar celda seleccionada
-        TextView btnReload = createControlBarItem("▶", "Conectar");
-        btnReload.setOnClickListener(v -> {
+        // 1. Conectar / Reintentar celda
+        controlBar.addView(createVectorControlBarItem(LimenIcons.ICON_PLAY, "Conectar", null, null, () -> {
             CellHolder h = cellHolders.get(selectedCellIndex);
             if (h.activeCamera != null) {
                 playCameraInCell(selectedCellIndex, h.activeCamera);
             } else {
                 showCameraPickerDialog(selectedCellIndex);
             }
-        });
-        controlBar.addView(btnReload);
+        }));
 
         // 2. Calidad SD / HD
-        btnQualityBadge = createControlBarItem(currentSubtype == 1 ? "SD" : "HD", "Calidad");
-        btnQualityBadge.setOnClickListener(v -> toggleStreamQuality());
-        controlBar.addView(btnQualityBadge);
+        iconQualityView = new LimenIcons.IconView(this, currentSubtype == 1 ? LimenIcons.ICON_SD : LimenIcons.ICON_HD, COLOR_TEXT_WHITE);
+        txtQualityLabel = new TextView(this);
+        controlBar.addView(createVectorControlBarItem(0, currentSubtype == 1 ? "Calidad SD" : "Calidad HD", iconQualityView, txtQualityLabel, this::toggleStreamQuality));
 
         // 3. Audio Mute / Unmute
-        btnMuteBadge = createControlBarItem(isMuted ? "🔇" : "🔊", "Audio");
-        btnMuteBadge.setOnClickListener(v -> {
+        iconMuteView = new LimenIcons.IconView(this, isMuted ? LimenIcons.ICON_VOLUME_OFF : LimenIcons.ICON_VOLUME_ON, COLOR_TEXT_WHITE);
+        controlBar.addView(createVectorControlBarItem(0, "Audio", iconMuteView, null, () -> {
             isMuted = !isMuted;
-            btnMuteBadge.setText(isMuted ? "🔇\nAudio" : "🔊\nAudio");
+            iconMuteView.setIconType(isMuted ? LimenIcons.ICON_VOLUME_OFF : LimenIcons.ICON_VOLUME_ON);
+            iconMuteView.setIconColor(isMuted ? COLOR_TEXT_WHITE : COLOR_ACCENT_BLUE);
             for (CellHolder h : cellHolders) {
                 if (h.player != null) h.player.setVolume(isMuted ? 0f : 1f);
             }
-        });
-        controlBar.addView(btnMuteBadge);
+        }));
 
-        // 4. Conmutador Grilla 1x1 / 2x2 (4 celdas)
-        btnGridBadge = createControlBarItem(currentGridMode == 1 ? "[ 1 ]" : "[ 4 ]", "Vista");
-        btnGridBadge.setOnClickListener(v -> switchGridMode(currentGridMode == 1 ? 4 : 1));
-        controlBar.addView(btnGridBadge);
+        // 4. Selector de Vista: 1 CH -> 4 CH -> 9 CH
+        int initialGridIcon = currentGridMode == 1 ? LimenIcons.ICON_GRID_1 : (currentGridMode == 4 ? LimenIcons.ICON_GRID_4 : LimenIcons.ICON_GRID_9);
+        iconGridView = new LimenIcons.IconView(this, initialGridIcon, COLOR_ACCENT_BLUE);
+        txtGridLabel = new TextView(this);
+        controlBar.addView(createVectorControlBarItem(0, "Vista " + currentGridMode + "CH", iconGridView, txtGridLabel, () -> {
+            if (currentGridMode == 1) switchGridMode(4);
+            else if (currentGridMode == 4) switchGridMode(9);
+            else switchGridMode(1);
+        }));
 
-        // 5. Detener / Limpiar celda activa
-        TextView btnStopCell = createControlBarItem("✕", "Cerrar");
-        btnStopCell.setOnClickListener(v -> stopCellPlayer(selectedCellIndex));
-        controlBar.addView(btnStopCell);
+        // 5. Cerrar canal activo
+        controlBar.addView(createVectorControlBarItem(LimenIcons.ICON_CLOSE, "Cerrar", null, null, () -> stopCellPlayer(selectedCellIndex)));
 
         page.addView(controlBar);
 
-        // ── TIRA INFERIOR DE CANALES RÁPIDOS (Permite elegir qué cámara poner en la celda azul seleccionada) ──
+        // ── TIRA INFERIOR DE CANALES DEL DISPOSITIVO SELECCIONADO ──
         LinearLayout selectorSection = new LinearLayout(this);
         selectorSection.setOrientation(LinearLayout.VERTICAL);
         selectorSection.setBackgroundColor(Color.parseColor(COLOR_BG_MAIN));
-        selectorSection.setPadding(dp(12), dp(10), dp(12), dp(12));
+        selectorSection.setPadding(dp(12), dp(8), dp(12), dp(12));
 
-        TextView hintTv = new TextView(this);
-        hintTv.setText("Toca un canal para abrirlo en el recuadro seleccionado (doble toque en el video para pantalla completa 16:9):");
-        hintTv.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-        hintTv.setTextSize(11);
-        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(
+        LinearLayout filterHeaderRow = new LinearLayout(this);
+        filterHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
+        filterHeaderRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams fhLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        hintLp.bottomMargin = dp(8);
-        selectorSection.addView(hintTv, hintLp);
+        fhLp.bottomMargin = dp(6);
+
+        TextView hintTv = new TextView(this);
+        hintTv.setText(activeLiveGroupFilter != null
+                ? "Canales de " + activeLiveGroupFilter + ":"
+                : "Todos los canales disponibles:");
+        hintTv.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
+        hintTv.setTextSize(11);
+        filterHeaderRow.addView(hintTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        // Botón para alternar filtro si desea ver otro cliente sin volver al Home
+        TextView btnChangeGroup = new TextView(this);
+        btnChangeGroup.setText("Cambiar equipo ▾");
+        btnChangeGroup.setTextColor(Color.parseColor(COLOR_ACCENT_BLUE));
+        btnChangeGroup.setTextSize(11);
+        btnChangeGroup.setTypeface(Typeface.DEFAULT_BOLD);
+        btnChangeGroup.setOnClickListener(v -> showGroupFilterSwitchDialog(hintTv));
+        filterHeaderRow.addView(btnChangeGroup);
+
+        selectorSection.addView(filterHeaderRow, fhLp);
 
         HorizontalScrollView chScroll = new HorizontalScrollView(this);
         chScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout chRow = new LinearLayout(this);
-        chRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        for (CameraItem cam : allCameras) {
-            Button pill = new Button(this);
-            pill.setText(cam.getGroupTitle() + " · " + cam.getShortChannelLabel());
-            pill.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-            pill.setTextSize(11);
-            pill.setAllCaps(false);
-            pill.setMinimumHeight(0);
-            pill.setMinHeight(0);
-            pill.setPadding(dp(12), dp(8), dp(12), dp(8));
-            pill.setBackground(roundBg(COLOR_BG_CARD, 8, COLOR_BORDER_DARK, 1));
-            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-            pLp.rightMargin = dp(8);
-            pill.setOnClickListener(v -> {
-                playCameraInCell(selectedCellIndex, cam);
-                if (currentGridMode == 4) {
-                    selectCell((selectedCellIndex + 1) % 4);
-                }
-            });
-            chRow.addView(pill, pLp);
-        }
-
-        chScroll.addView(chRow);
+        bottomChannelRow = new LinearLayout(this);
+        bottomChannelRow.setOrientation(LinearLayout.HORIZONTAL);
+        chScroll.addView(bottomChannelRow);
         selectorSection.addView(chScroll);
-        page.addView(selectorSection);
 
+        populateLiveBottomChannelPills();
+
+        page.addView(selectorSection);
         rootContainer.addView(page);
 
-        // Si el usuario eligió una cámara o un dispositivo en el Home, iniciar SOLO lo que pidió
+        // Iniciar únicamente las cámaras solicitadas
         if (singleCamToStart != null) {
             selectCell(0);
             playCameraInCell(0, singleCamToStart);
         } else if (groupCamsToStart != null && !groupCamsToStart.isEmpty()) {
-            int count = Math.min(groupCamsToStart.size(), 4);
+            int maxCells = currentGridMode;
+            int count = Math.min(groupCamsToStart.size(), maxCells);
             for (int i = 0; i < count; i++) {
                 final int idx = i;
                 final CameraItem c = groupCamsToStart.get(i);
@@ -1160,29 +1161,99 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private TextView createControlBarItem(String iconText, String subLabel) {
-        TextView tv = new TextView(this);
-        tv.setText(iconText + "\n" + subLabel);
-        tv.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-        tv.setTextSize(12);
-        tv.setGravity(Gravity.CENTER);
-        tv.setPadding(dp(6), dp(4), dp(6), dp(4));
-        tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        return tv;
+    private void populateLiveBottomChannelPills() {
+        if (bottomChannelRow == null) return;
+        bottomChannelRow.removeAllViews();
+
+        List<CameraItem> filteredCams = getCamerasForCurrentLiveFilter();
+        for (CameraItem cam : filteredCams) {
+            Button pill = new Button(this);
+            pill.setText(cam.getShortChannelLabel());
+            pill.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+            pill.setTextSize(11);
+            pill.setAllCaps(false);
+            pill.setMinimumHeight(0);
+            pill.setMinHeight(0);
+            pill.setPadding(dp(12), dp(7), dp(12), dp(7));
+            pill.setBackground(roundBg(COLOR_BG_CARD, 8, COLOR_BORDER_DARK, 1));
+            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            pLp.rightMargin = dp(8);
+            pill.setOnClickListener(v -> {
+                playCameraInCell(selectedCellIndex, cam);
+                if (currentGridMode > 1) {
+                    selectCell((selectedCellIndex + 1) % currentGridMode);
+                }
+            });
+            bottomChannelRow.addView(pill, pLp);
+        }
     }
 
-    private void buildLiveCells16x9() {
+    private void showGroupFilterSwitchDialog(TextView hintTv) {
+        Map<String, List<CameraItem>> groups = new LinkedHashMap<>();
+        for (CameraItem c : allCameras) {
+            String g = c.getGroupTitle();
+            if (!groups.containsKey(g)) groups.put(g, new ArrayList<>());
+            groups.get(g).add(c);
+        }
+        final List<String> names = new ArrayList<>(groups.keySet());
+        names.add(0, "Todos los dispositivos");
+
+        String[] arr = names.toArray(new String[0]);
+        new AlertDialog.Builder(this)
+                .setTitle("Seleccionar Dispositivo")
+                .setItems(arr, (d, which) -> {
+                    if (which == 0) {
+                        activeLiveGroupFilter = null;
+                        liveHeaderTitle.setText("Todos los equipos");
+                        hintTv.setText("Todos los canales disponibles:");
+                    } else {
+                        activeLiveGroupFilter = names.get(which);
+                        liveHeaderTitle.setText(activeLiveGroupFilter);
+                        hintTv.setText("Canales de " + activeLiveGroupFilter + ":");
+                    }
+                    populateLiveBottomChannelPills();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private View createVectorControlBarItem(int iconType, String label, LimenIcons.IconView customIconView, TextView customLabelView, Runnable onClick) {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER);
+        col.setPadding(dp(4), dp(4), dp(4), dp(4));
+        col.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        col.setOnClickListener(v -> onClick.run());
+
+        LimenIcons.IconView iv = customIconView != null
+                ? customIconView
+                : new LimenIcons.IconView(this, iconType, COLOR_TEXT_WHITE);
+        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(dp(22), dp(22));
+        ivLp.bottomMargin = dp(4);
+        col.addView(iv, ivLp);
+
+        TextView tv = customLabelView != null ? customLabelView : new TextView(this);
+        tv.setText(label);
+        tv.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
+        tv.setTextSize(10);
+        tv.setGravity(Gravity.CENTER);
+        col.addView(tv);
+
+        return col;
+    }
+
+    private void buildLiveCells9() {
         releaseAllPlayers();
         cellHolders.clear();
-        rowTop.removeAllViews();
-        rowBottom.removeAllViews();
+        for (LinearLayout r : gridRows) r.removeAllViews();
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 9; i++) {
             final int cellIdx = i;
             CellHolder holder = new CellHolder();
             holder.index = cellIdx;
 
-            // Recuadro con el color exacto de Captura 2 (#242B35) y borde azul (#2E82FF) cuando está seleccionado
             FrameLayout cellFrame = new FrameLayout(this);
             cellFrame.setBackground(roundBg(
                     COLOR_BG_CELL, 0,
@@ -1190,7 +1261,6 @@ public class MainActivity extends AppCompatActivity {
                     cellIdx == selectedCellIndex ? 2 : 1
             ));
 
-            // Miniatura de fondo de la última vez que se vio la cámara (en formato 16:9)
             ImageView thumbBg = new ImageView(this);
             thumbBg.setScaleType(ImageView.ScaleType.FIT_CENTER);
             thumbBg.setAlpha(0.45f);
@@ -1199,7 +1269,6 @@ public class MainActivity extends AppCompatActivity {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             ));
 
-            // PlayerView nativo en modo 16:9 (RESIZE_MODE_FIT garantiza relación 16:9 exacta sin deformar)
             PlayerView pv = new PlayerView(this);
             pv.setUseController(false);
             pv.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
@@ -1208,46 +1277,39 @@ public class MainActivity extends AppCompatActivity {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             ));
 
-            // Signo "+" en el centro cuando la celda está vacía (idéntico a Captura 2)
-            TextView plusTv = new TextView(this);
-            plusTv.setText("+");
-            plusTv.setTextColor(Color.parseColor("#526075"));
-            plusTv.setTextSize(32);
-            plusTv.setGravity(Gravity.CENTER);
-            FrameLayout.LayoutParams plusLp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            );
+            // Signo "+" vectorial de Limen en el centro cuando la celda está vacía
+            LimenIcons.IconView plusIv = new LimenIcons.IconView(this, LimenIcons.ICON_PLUS, "#526075");
+            FrameLayout.LayoutParams plusLp = new FrameLayout.LayoutParams(dp(26), dp(26));
             plusLp.gravity = Gravity.CENTER;
-            cellFrame.addView(plusTv, plusLp);
+            cellFrame.addView(plusIv, plusLp);
 
-            // Spinner de conexión
             ProgressBar spinner = new ProgressBar(this);
             spinner.setVisibility(View.GONE);
-            FrameLayout.LayoutParams spinLp = new FrameLayout.LayoutParams(dp(32), dp(32));
+            FrameLayout.LayoutParams spinLp = new FrameLayout.LayoutParams(dp(28), dp(28));
             spinLp.gravity = Gravity.CENTER;
             cellFrame.addView(spinner, spinLp);
 
-            // Etiqueta de estado debajo del spinner
             TextView lblStatus = new TextView(this);
             lblStatus.setText("");
             lblStatus.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
-            lblStatus.setTextSize(11);
+            lblStatus.setTextSize(10);
             lblStatus.setGravity(Gravity.CENTER);
             lblStatus.setVisibility(View.GONE);
             FrameLayout.LayoutParams stLp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             );
             stLp.gravity = Gravity.CENTER;
-            stLp.topMargin = dp(36);
+            stLp.topMargin = dp(30);
             cellFrame.addView(lblStatus, stLp);
 
-            // Barra superior transparente con nombre de cámara
             TextView lblTitle = new TextView(this);
             lblTitle.setText("");
             lblTitle.setTextColor(Color.WHITE);
-            lblTitle.setTextSize(11);
+            lblTitle.setTextSize(10);
+            lblTitle.setSingleLine(true);
+            lblTitle.setEllipsize(TextUtils.TruncateAt.END);
             lblTitle.setBackgroundColor(Color.parseColor("#77000000"));
-            lblTitle.setPadding(dp(8), dp(3), dp(8), dp(3));
+            lblTitle.setPadding(dp(6), dp(2), dp(6), dp(2));
             lblTitle.setVisibility(View.GONE);
             FrameLayout.LayoutParams tlLp = new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1258,9 +1320,13 @@ public class MainActivity extends AppCompatActivity {
             cellFrame.setOnClickListener(v -> {
                 long now = System.currentTimeMillis();
                 if (now - holder.lastTapTime < 350) {
-                    // Doble toque: alternar entre 1x1 (16:9 grande) y 2x2
+                    // Doble toque: maximizar a 1x1 o volver a multicanal (4 o 9)
                     selectedCellIndex = cellIdx;
-                    switchGridMode(currentGridMode == 4 ? 1 : 4);
+                    if (currentGridMode == 1) {
+                        switchGridMode(countActiveCells() > 4 ? 9 : 4);
+                    } else {
+                        switchGridMode(1);
+                    }
                 } else {
                     selectCell(cellIdx);
                     if (holder.activeCamera == null) {
@@ -1279,21 +1345,18 @@ public class MainActivity extends AppCompatActivity {
             holder.container = cellFrame;
             holder.thumbPreview = thumbBg;
             holder.playerView = pv;
-            holder.plusIcon = plusTv;
+            holder.plusIcon = plusIv;
             holder.spinner = spinner;
             holder.labelStatus = lblStatus;
             holder.labelTitle = lblTitle;
 
             cellHolders.add(holder);
 
+            int rowIdx = i / 3;
             LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.MATCH_PARENT, 1f
             );
-            if (i < 2) {
-                rowTop.addView(cellFrame, cellLp);
-            } else {
-                rowBottom.addView(cellFrame, cellLp);
-            }
+            gridRows.get(rowIdx).addView(cellFrame, cellLp);
         }
 
         applyGridVisibility();
@@ -1313,42 +1376,72 @@ public class MainActivity extends AppCompatActivity {
 
     private void switchGridMode(int mode) {
         currentGridMode = mode;
-        if (btnGridBadge != null) {
-            btnGridBadge.setText((mode == 1 ? "[ 1 ]" : "[ 4 ]") + "\nVista");
+        if (selectedCellIndex >= mode) {
+            selectedCellIndex = 0;
         }
+        if (iconGridView != null) {
+            int ic = mode == 1 ? LimenIcons.ICON_GRID_1 : (mode == 4 ? LimenIcons.ICON_GRID_4 : LimenIcons.ICON_GRID_9);
+            iconGridView.setIconType(ic);
+        }
+        if (txtGridLabel != null) {
+            txtGridLabel.setText("Vista " + mode + "CH");
+        }
+        selectCell(selectedCellIndex);
         applyGridVisibility();
     }
 
     private void applyGridVisibility() {
-        if (cellHolders.size() < 4 || rowTop == null || rowBottom == null) return;
+        if (cellHolders.size() < 9 || gridRows.size() < 3) return;
+
         if (currentGridMode == 1) {
-            if (selectedCellIndex < 2) {
-                rowTop.setVisibility(View.VISIBLE);
-                rowBottom.setVisibility(View.GONE);
-                cellHolders.get(0).container.setVisibility(selectedCellIndex == 0 ? View.VISIBLE : View.GONE);
-                cellHolders.get(1).container.setVisibility(selectedCellIndex == 1 ? View.VISIBLE : View.GONE);
-            } else {
-                rowTop.setVisibility(View.GONE);
-                rowBottom.setVisibility(View.VISIBLE);
-                cellHolders.get(2).container.setVisibility(selectedCellIndex == 2 ? View.VISIBLE : View.GONE);
-                cellHolders.get(3).container.setVisibility(selectedCellIndex == 3 ? View.VISIBLE : View.GONE);
+            int targetRow = selectedCellIndex / 3;
+            for (int r = 0; r < 3; r++) {
+                gridRows.get(r).setVisibility(r == targetRow ? View.VISIBLE : View.GONE);
             }
-        } else {
-            rowTop.setVisibility(View.VISIBLE);
-            rowBottom.setVisibility(View.VISIBLE);
+            for (int i = 0; i < 9; i++) {
+                cellHolders.get(i).container.setVisibility(i == selectedCellIndex ? View.VISIBLE : View.GONE);
+            }
+        } else if (currentGridMode == 4) {
+            // En modo 4CH mostramos las filas 0 y 1 con las celdas 0,1 (arriba) y 3,4 o redistribuimos las primeras 4 celdas
+            // Para que las celdas 0, 1, 2, 3 queden en 2x2 limpio:
+            for (LinearLayout r : gridRows) r.removeAllViews();
+            LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            gridRows.get(0).addView(cellHolders.get(0).container, cellLp);
+            gridRows.get(0).addView(cellHolders.get(1).container, cellLp);
+            gridRows.get(1).addView(cellHolders.get(2).container, cellLp);
+            gridRows.get(1).addView(cellHolders.get(3).container, cellLp);
+
+            gridRows.get(0).setVisibility(View.VISIBLE);
+            gridRows.get(1).setVisibility(View.VISIBLE);
+            gridRows.get(2).setVisibility(View.GONE);
             for (int i = 0; i < 4; i++) {
                 cellHolders.get(i).container.setVisibility(View.VISIBLE);
             }
+        } else {
+            // Modo 9CH (3x3 completo)
+            for (LinearLayout r : gridRows) r.removeAllViews();
+            LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            for (int i = 0; i < 9; i++) {
+                cellHolders.get(i).container.setVisibility(View.VISIBLE);
+                gridRows.get(i / 3).addView(cellHolders.get(i).container, cellLp);
+            }
+            gridRows.get(0).setVisibility(View.VISIBLE);
+            gridRows.get(1).setVisibility(View.VISIBLE);
+            gridRows.get(2).setVisibility(View.VISIBLE);
         }
     }
 
     private void toggleStreamQuality() {
         currentSubtype = (currentSubtype == 1) ? 0 : 1;
-        if (btnQualityBadge != null) {
-            btnQualityBadge.setText((currentSubtype == 1 ? "SD" : "HD") + "\nCalidad");
+        if (iconQualityView != null) {
+            iconQualityView.setIconType(currentSubtype == 1 ? LimenIcons.ICON_SD : LimenIcons.ICON_HD);
+            iconQualityView.setIconColor(currentSubtype == 1 ? COLOR_TEXT_WHITE : COLOR_ACCENT_BLUE);
+        }
+        if (txtQualityLabel != null) {
+            txtQualityLabel.setText(currentSubtype == 1 ? "Calidad SD" : "Calidad HD");
         }
         Toast.makeText(this,
-                currentSubtype == 1 ? "Calidad SD (Fluida)" : "Calidad HD (Alta Definición)",
+                currentSubtype == 1 ? "Calidad SD (Rápida)" : "Calidad HD (Alta Definición)",
                 Toast.LENGTH_SHORT).show();
 
         for (CellHolder h : cellHolders) {
@@ -1359,37 +1452,42 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showCameraPickerDialog(int cellIdx) {
-        if (allCameras.isEmpty()) {
+        final List<CameraItem> cams = getCamerasForCurrentLiveFilter();
+        if (cams.isEmpty()) {
             Toast.makeText(this, "No hay cámaras disponibles", Toast.LENGTH_SHORT).show();
             return;
         }
-        String[] items = new String[allCameras.size()];
-        for (int i = 0; i < allCameras.size(); i++) {
-            CameraItem c = allCameras.get(i);
+        String[] items = new String[cams.size()];
+        for (int i = 0; i < cams.size(); i++) {
+            CameraItem c = cams.get(i);
             items[i] = c.getGroupTitle() + "  ▸  " + c.getShortChannelLabel();
         }
         new AlertDialog.Builder(this)
-                .setTitle("Seleccionar cámara para Ventana " + (cellIdx + 1))
-                .setItems(items, (d, which) -> playCameraInCell(cellIdx, allCameras.get(which)))
+                .setTitle("Ventana " + (cellIdx + 1) + (activeLiveGroupFilter != null ? " · " + activeLiveGroupFilter : ""))
+                .setItems(items, (d, which) -> playCameraInCell(cellIdx, cams.get(which)))
                 .setNegativeButton("Cancelar", null)
                 .show();
     }
 
     private void showDeviceChannelSelectorModal(String groupTitle, List<CameraItem> cams) {
-        String[] items = new String[cams.size() + 1];
-        items[0] = "▶  Ver todas las cámaras de " + groupTitle + " (Multicanal)";
+        String[] items = new String[cams.size() + 2];
+        items[0] = "▶  Abrir en Vista 4 Canales (" + groupTitle + ")";
+        items[1] = "▶  Abrir en Vista 9 Canales (" + groupTitle + ")";
         for (int i = 0; i < cams.size(); i++) {
-            items[i + 1] = "📹  " + cams.get(i).getShortChannelLabel();
+            items[i + 2] = "Canal " + cams.get(i).canal + "  ·  " + cams.get(i).getShortChannelLabel();
         }
         new AlertDialog.Builder(this)
                 .setTitle(groupTitle)
                 .setItems(items, (d, which) -> {
                     if (which == 0) {
-                        currentGridMode = cams.size() > 1 ? 4 : 1;
-                        showLiveViewScreen(null, cams);
+                        currentGridMode = 4;
+                        showLiveViewScreen(null, cams, groupTitle);
+                    } else if (which == 1) {
+                        currentGridMode = 9;
+                        showLiveViewScreen(null, cams, groupTitle);
                     } else {
                         currentGridMode = 1;
-                        showLiveViewScreen(cams.get(which - 1), null);
+                        showLiveViewScreen(cams.get(which - 2), null, groupTitle);
                     }
                 })
                 .setNegativeButton("Cerrar", null)
@@ -1397,7 +1495,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 4. PANTALLA GESTOR DE DISPOSITIVOS (DEVICE MANAGER - Captura 12)
+    // 4. PANTALLA GESTOR DE DISPOSITIVOS CON ICONOS LIMEN
     // =========================================================================
     private void showDeviceManagerScreen() {
         currentTab = 2;
@@ -1453,12 +1551,14 @@ public class MainActivity extends AppCompatActivity {
             );
             rLp.bottomMargin = dp(10);
 
-            TextView badge = new TextView(this);
-            badge.setText("📹");
-            badge.setTextSize(17);
-            badge.setGravity(Gravity.CENTER);
+            FrameLayout badge = new FrameLayout(this);
             badge.setBackground(circleBg("#1E3A5F", null, 0));
-            LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(dp(40), dp(40));
+            LimenIcons.IconView badgeIcon = new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, COLOR_ACCENT_BLUE);
+            FrameLayout.LayoutParams biLp = new FrameLayout.LayoutParams(dp(20), dp(20));
+            biLp.gravity = Gravity.CENTER;
+            badge.addView(badgeIcon, biLp);
+
+            LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(dp(42), dp(42));
             bLp.rightMargin = dp(12);
             row.addView(badge, bLp);
 
@@ -1479,11 +1579,8 @@ public class MainActivity extends AppCompatActivity {
 
             row.addView(infoCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            TextView arrow = new TextView(this);
-            arrow.setText("›");
-            arrow.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
-            arrow.setTextSize(22);
-            row.addView(arrow);
+            LimenIcons.IconView arrow = new LimenIcons.IconView(this, LimenIcons.ICON_CHEVRON_R, COLOR_TEXT_GRAY);
+            row.addView(arrow, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
             row.setOnClickListener(v -> showDeviceChannelSelectorModal(gTitle, cams));
             list.addView(row, rLp);
@@ -1496,7 +1593,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 5. PANTALLA DE PERFIL ("ME" - Captura 4)
+    // 5. PANTALLA DE PERFIL ("ME") CON ICONOS LIMEN
     // =========================================================================
     private void showProfileScreen() {
         currentTab = 3;
@@ -1517,16 +1614,13 @@ public class MainActivity extends AppCompatActivity {
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         content.setPadding(dp(20), dp(42), dp(20), dp(24));
 
-        // Avatar circular
-        TextView avatar = new TextView(this);
-        String initial = (currentUserName != null && !currentUserName.isEmpty())
-                ? currentUserName.substring(0, 1).toUpperCase() : "L";
-        avatar.setText(initial);
-        avatar.setTextColor(Color.WHITE);
-        avatar.setTextSize(30);
-        avatar.setTypeface(Typeface.DEFAULT_BOLD);
-        avatar.setGravity(Gravity.CENTER);
+        FrameLayout avatar = new FrameLayout(this);
         avatar.setBackground(circleBg("#2E3A4E", "#94A3B8", 2));
+        LimenIcons.IconView userIcon = new LimenIcons.IconView(this, LimenIcons.ICON_USER, COLOR_TEXT_WHITE);
+        FrameLayout.LayoutParams uiLp = new FrameLayout.LayoutParams(dp(36), dp(36));
+        uiLp.gravity = Gravity.CENTER;
+        avatar.addView(userIcon, uiLp);
+
         LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(80), dp(80));
         avLp.bottomMargin = dp(12);
         content.addView(avatar, avLp);
@@ -1549,7 +1643,6 @@ public class MainActivity extends AppCompatActivity {
         umLp.bottomMargin = dp(28);
         content.addView(uMail, umLp);
 
-        // Tarjeta de opciones estilo Captura 4
         LinearLayout menuCard = new LinearLayout(this);
         menuCard.setOrientation(LinearLayout.VERTICAL);
         menuCard.setBackground(roundBg(COLOR_BG_CARD, 14, null, 0));
@@ -1559,10 +1652,9 @@ public class MainActivity extends AppCompatActivity {
         );
         mcLp.bottomMargin = dp(20);
 
-        menuCard.addView(createProfileRow("📹  Canales autorizados", allCameras.size() + " cámaras"));
-        menuCard.addView(createProfileRow("⚡  Calidad por defecto", currentSubtype == 1 ? "SD (Fluida)" : "HD (1080p)"));
-        menuCard.addView(createProfileRow("📐  Formato de video", "16:9 Panorámico"));
-        menuCard.addView(createProfileRow("🛡  Versión de la App", "LIMEN EYES v2.2.0 Nativa"));
+        menuCard.addView(createProfileRow(LimenIcons.ICON_VIDEO, "Canales autorizados", allCameras.size() + " cámaras"));
+        menuCard.addView(createProfileRow(LimenIcons.ICON_GRID_9, "Vistas soportadas", "1CH · 4CH · 9CH (16:9)"));
+        menuCard.addView(createProfileRow(LimenIcons.ICON_SHIELD, "Versión de la App", "LIMEN EYES v2.3.0 Nativa"));
 
         content.addView(menuCard, mcLp);
 
@@ -1582,11 +1674,16 @@ public class MainActivity extends AppCompatActivity {
         rootContainer.addView(page);
     }
 
-    private View createProfileRow(String left, String right) {
+    private View createProfileRow(int iconType, String left, String right) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(4), dp(14), dp(4), dp(14));
+
+        LimenIcons.IconView iv = new LimenIcons.IconView(this, iconType, COLOR_ACCENT_BLUE);
+        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ivLp.rightMargin = dp(12);
+        row.addView(iv, ivLp);
 
         TextView l = new TextView(this);
         l.setText(left);
@@ -1602,7 +1699,7 @@ public class MainActivity extends AppCompatActivity {
         return row;
     }
 
-    // ── BARRA INFERIOR DE NAVEGACIÓN (Inicio | Vista en Vivo | Dispositivos | Me) ──
+    // ── BARRA INFERIOR DE NAVEGACIÓN CON ICONOS VECTORIALES LIMEN ──
     private View buildBottomNavBar() {
         LinearLayout nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
@@ -1610,15 +1707,15 @@ public class MainActivity extends AppCompatActivity {
         nav.setBackgroundColor(Color.parseColor(COLOR_BG_CARD));
         nav.setPadding(dp(8), dp(8), dp(8), dp(8));
 
-        nav.addView(createNavTab("⌂", "Inicio", currentTab == 0, this::showHomeScreen));
-        nav.addView(createNavTab("▶", "En Vivo", currentTab == 1, () -> showLiveViewScreen(null, null)));
-        nav.addView(createNavTab("🖧", "Dispositivos", currentTab == 2, this::showDeviceManagerScreen));
-        nav.addView(createNavTab("☺", "Me", currentTab == 3, this::showProfileScreen));
+        nav.addView(createNavTab(LimenIcons.ICON_HOME, "Inicio", currentTab == 0, this::showHomeScreen));
+        nav.addView(createNavTab(LimenIcons.ICON_VIDEO, "En Vivo", currentTab == 1, () -> showLiveViewScreen(null, null, activeLiveGroupFilter)));
+        nav.addView(createNavTab(LimenIcons.ICON_SERVER, "Dispositivos", currentTab == 2, this::showDeviceManagerScreen));
+        nav.addView(createNavTab(LimenIcons.ICON_USER, "Me", currentTab == 3, this::showProfileScreen));
 
         return nav;
     }
 
-    private View createNavTab(String icon, String label, boolean active, Runnable action) {
+    private View createNavTab(int iconType, String label, boolean active, Runnable action) {
         LinearLayout tab = new LinearLayout(this);
         tab.setOrientation(LinearLayout.VERTICAL);
         tab.setGravity(Gravity.CENTER);
@@ -1627,12 +1724,10 @@ public class MainActivity extends AppCompatActivity {
 
         String color = active ? COLOR_ACCENT_BLUE : COLOR_TEXT_GRAY;
 
-        TextView ic = new TextView(this);
-        ic.setText(icon);
-        ic.setTextColor(Color.parseColor(color));
-        ic.setTextSize(18);
-        ic.setGravity(Gravity.CENTER);
-        tab.addView(ic);
+        LimenIcons.IconView ic = new LimenIcons.IconView(this, iconType, color);
+        LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(22), dp(22));
+        icLp.bottomMargin = dp(3);
+        tab.addView(ic, icLp);
 
         TextView lb = new TextView(this);
         lb.setText(label);
@@ -1655,7 +1750,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadCameraThumbnailAsync(int camId, ImageView targetIv) {
-        // 1. Si existe captura en el teléfono de la última vez que se vio, mostrar al instante
         File localFile = getLocalThumbFile(camId);
         if (localFile.exists() && localFile.length() > 500) {
             Bitmap bm = BitmapFactory.decodeFile(localFile.getAbsolutePath());
@@ -1665,7 +1759,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // 2. Actualizar en segundo plano desde el caché de capturas del servidor
         executor.execute(() -> {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(BASE_URL + "/api/camaras/" + camId + "/thumb.jpg").openConnection();
@@ -1709,7 +1802,6 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
             } else {
-                // Pedir al servidor que actualice la captura de esta cámara activa
                 executor.execute(() -> {
                     try {
                         httpGet(BASE_URL + "/api/camaras/" + camId + "/thumb.jpg?live=1", authToken);
@@ -1720,7 +1812,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // 7. MOTOR DE REPRODUCCIÓN NATIVO EXOPLAYER (Con H.264 + HEVC + MP4=FLAC)
+    // 7. MOTOR DE REPRODUCCIÓN NATIVO EXOPLAYER
     // =========================================================================
     private void playCameraInCell(int cellIdx, CameraItem cam) {
         if (cellIdx < 0 || cellIdx >= cellHolders.size()) return;
@@ -1729,7 +1821,7 @@ public class MainActivity extends AppCompatActivity {
         final int currentReqId = ++holder.requestId;
 
         mainHandler.post(() -> {
-            if (liveHeaderTitle != null) {
+            if (liveHeaderTitle != null && activeLiveGroupFilter == null) {
                 liveHeaderTitle.setText(cam.getGroupTitle());
             }
             holder.plusIcon.setVisibility(View.GONE);
@@ -1739,7 +1831,6 @@ public class MainActivity extends AppCompatActivity {
             holder.labelStatus.setVisibility(View.VISIBLE);
             holder.spinner.setVisibility(View.VISIBLE);
 
-            // Mostrar como fondo la última captura de esta cámara mientras carga el stream en vivo
             loadCameraThumbnailAsync(cam.id, holder.thumbPreview);
 
             if (holder.player != null) {
@@ -1781,7 +1872,7 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     if (holder.requestId == currentReqId) {
                         holder.spinner.setVisibility(View.GONE);
-                        holder.labelStatus.setText("Sin conexión · Toca ▶ para reintentar");
+                        holder.labelStatus.setText("Sin conexión · Toca Conectar");
                         holder.labelStatus.setVisibility(View.VISIBLE);
                     }
                 });
@@ -1812,7 +1903,6 @@ public class MainActivity extends AppCompatActivity {
                             holder.labelStatus.setVisibility(View.GONE);
                             holder.thumbPreview.setVisibility(View.GONE);
                             holder.plusIcon.setVisibility(View.GONE);
-                            // Guardar captura fresca de la cámara vista
                             mainHandler.postDelayed(() -> captureCurrentFrameToCache(holder, camId), 1200);
                         } else if (state == Player.STATE_BUFFERING) {
                             holder.spinner.setVisibility(View.VISIBLE);
@@ -1926,7 +2016,7 @@ public class MainActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (currentTab == 1) {
             if (currentGridMode == 1 && countActiveCells() > 1) {
-                switchGridMode(4);
+                switchGridMode(countActiveCells() > 4 ? 9 : 4);
             } else {
                 showHomeScreen();
             }
