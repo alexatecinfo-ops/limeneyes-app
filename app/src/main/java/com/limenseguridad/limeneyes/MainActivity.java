@@ -3478,7 +3478,11 @@ public class MainActivity extends AppCompatActivity {
         btnReject.setBackground(roundBg("#2A161B", 10, "#EF4444", 1));
         btnReject.setOnClickListener(v -> {
             dialog.dismiss();
-            executor.execute(() -> httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/rechazar", "{}", authToken));
+            executor.execute(() -> {
+                try {
+                    httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/rechazar", "{}", authToken);
+                } catch (Exception ignored) {}
+            });
         });
         LinearLayout.LayoutParams brLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42));
         brLp.rightMargin = dp(8);
@@ -3492,11 +3496,13 @@ public class MainActivity extends AppCompatActivity {
         btnAccept.setOnClickListener(v -> {
             dialog.dismiss();
             executor.execute(() -> {
-                HttpResponse r = httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/aceptar", "{}", authToken);
-                mainHandler.post(() -> {
-                    Toast.makeText(this, "Dispositivo aceptado correctamente", Toast.LENGTH_SHORT).show();
-                    loadCamerasAndOpenHome();
-                });
+                try {
+                    HttpResponse r = httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/aceptar", "{}", authToken);
+                    mainHandler.post(() -> {
+                        Toast.makeText(this, "Dispositivo aceptado correctamente", Toast.LENGTH_SHORT).show();
+                        loadCamerasAndOpenHome();
+                    });
+                } catch (Exception ignored) {}
             });
         });
         btns.addView(btnAccept, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
