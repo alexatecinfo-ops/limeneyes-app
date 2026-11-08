@@ -3301,7 +3301,8 @@ public class MainActivity extends AppCompatActivity {
         final List<android.widget.CheckBox> channelBoxes = new ArrayList<>();
         for (CameraItem c : cams) {
             android.widget.CheckBox chk = new android.widget.CheckBox(this);
-            chk.setText("CH " + c.canal + " · " + c.getCleanName());
+            String chName = (c.nombre != null && !c.nombre.isEmpty()) ? c.nombre : ("Canal " + c.canal);
+            chk.setText("CH " + c.canal + " - " + chName);
             chk.setChecked(true);
             chk.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
             chk.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
