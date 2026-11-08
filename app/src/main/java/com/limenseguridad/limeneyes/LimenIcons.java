@@ -53,6 +53,7 @@ public class LimenIcons {
     public static final int ICON_CALENDAR     = 35;
     public static final int ICON_EDIT         = 36;
     public static final int ICON_CHEVRON_DOWN = 37;
+    public static final int ICON_LOGO_LIMEN   = 38;
 
     private static final Typeface ICON_TYPEFACE = Typeface.create("sans-serif-medium", Typeface.BOLD);
 
@@ -428,6 +429,31 @@ public class LimenIcons {
                     paint.setTextAlign(Paint.Align.CENTER);
                     String t = (iconType == ICON_HD) ? "HD" : "SD";
                     canvas.drawText(t, 12 * s, 15.1f * s, paint);
+                    break;
+                }
+                                case ICON_LOGO_LIMEN: {
+                    // Escudo perimetral de Limen Seguridad
+                    path.moveTo(12 * s, 2.5f * s);
+                    path.lineTo(20 * s, 6 * s);
+                    path.lineTo(20 * s, 12 * s);
+                    path.quadTo(20 * s, 18.5f * s, 12 * s, 21.5f * s);
+                    path.quadTo(4 * s, 18.5f * s, 4 * s, 12 * s);
+                    path.lineTo(4 * s, 6 * s);
+                    path.close();
+                    canvas.drawPath(path, paint);
+
+                    // Ojo / Lente de vigilancia central (Limen Eyes)
+                    Path eyePath = new Path();
+                    eyePath.moveTo(6.5f * s, 12f * s);
+                    eyePath.quadTo(12f * s, 7.5f * s, 17.5f * s, 12f * s);
+                    eyePath.quadTo(12f * s, 16.5f * s, 6.5f * s, 12f * s);
+                    eyePath.close();
+                    canvas.drawPath(eyePath, paint);
+
+                    // Pupila / sensor óptico
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawCircle(12 * s, 12 * s, 2.2f * s, paint);
+                    paint.setStyle(Paint.Style.STROKE);
                     break;
                 }
                 case ICON_BADGE_1:

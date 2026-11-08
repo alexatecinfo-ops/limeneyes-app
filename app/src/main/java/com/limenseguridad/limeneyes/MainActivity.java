@@ -2,6 +2,7 @@ package com.limenseguridad.limeneyes;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -92,20 +93,20 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
-    private static final String COLOR_BG_MAIN      = "#090D16";
-    private static final String COLOR_BG_HEADER    = "#0F1624";
-    private static final String COLOR_BG_CARD      = "#131C2E";
-    private static final String COLOR_BG_ELEVATED  = "#1A253B";
-    private static final String COLOR_BG_INPUT     = "#151F32";
-    private static final String COLOR_BG_CELL      = "#0D131F";
-    private static final String COLOR_ACCENT_BLUE  = "#3B82F6";
-    private static final String COLOR_ACCENT_CYAN  = "#38BDF8";
-    private static final String COLOR_BTN_BLUE     = "#2563EB";
+    private static final String COLOR_BG_MAIN      = "#080B14";
+    private static final String COLOR_BG_HEADER    = "#0F1520";
+    private static final String COLOR_BG_CARD      = "#141C2E";
+    private static final String COLOR_BG_ELEVATED  = "#1A233A";
+    private static final String COLOR_BG_INPUT     = "#0D131F";
+    private static final String COLOR_BG_CELL      = "#060910";
+    private static final String COLOR_ACCENT_BLUE  = "#6366F1";
+    private static final String COLOR_ACCENT_CYAN  = "#818CF8";
+    private static final String COLOR_BTN_BLUE     = "#4F46E5";
     private static final String COLOR_ONLINE       = "#10B981";
     private static final String COLOR_TEXT_WHITE   = "#F8FAFC";
     private static final String COLOR_TEXT_GRAY    = "#94A3B8";
     private static final String COLOR_TEXT_MUTED   = "#64748B";
-    private static final String COLOR_BORDER_DARK  = "#23314B";
+    private static final String COLOR_BORDER_DARK  = "#20283E";
 
     // Tipografía 100% uniforme en toda la aplicación
     private static final Typeface FONT_REGULAR = Typeface.create("sans-serif", Typeface.NORMAL);
@@ -355,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
         shieldBadge.setBackground(roundBg(COLOR_BG_CARD, 20, COLOR_BORDER_DARK, 1));
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(64), dp(64));
         badgeLp.bottomMargin = dp(16);
-        LimenIcons.IconView shieldIcon = new LimenIcons.IconView(this, LimenIcons.ICON_SHIELD, COLOR_ACCENT_CYAN);
+        LimenIcons.IconView shieldIcon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
         shieldBadge.addView(shieldIcon, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
         container.addView(shieldBadge, badgeLp);
 
@@ -376,7 +377,7 @@ public class MainActivity extends AppCompatActivity {
         container.addView(title, titleLp);
 
         TextView subTitle = new TextView(this);
-        subTitle.setText("Monitoreo profesional de cámaras y grabadores P2P");
+        subTitle.setText("Monitoreo profesional de videovigilancia privada y control perimetral");
         styleText(subTitle, 13, COLOR_TEXT_GRAY, false);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -526,6 +527,17 @@ public class MainActivity extends AppCompatActivity {
         container.addView(googleBtn, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+
+        TextView legalFooter = new TextView(this);
+        legalFooter.setText("LIMEN EYES v2.4.2 · Desarrollada por LIMEN SEGURIDAD\n© 2026 Limen Seguridad · Monitoreo y Auditoría Perimetral");
+        styleText(legalFooter, 11, COLOR_TEXT_MUTED, false);
+        legalFooter.setGravity(Gravity.CENTER);
+        legalFooter.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams lfLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        lfLp.topMargin = dp(32);
+        container.addView(legalFooter, lfLp);
 
         scroll.addView(container);
         rootContainer.addView(scroll);
@@ -771,11 +783,22 @@ public class MainActivity extends AppCompatActivity {
         });
         header.addView(btnToggleMode, new LinearLayout.LayoutParams(dp(23), dp(23)));
 
+        LinearLayout titleLockup = new LinearLayout(this);
+        titleLockup.setOrientation(LinearLayout.HORIZONTAL);
+        titleLockup.setGravity(Gravity.CENTER);
+
+        LimenIcons.IconView brandLogo = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        LinearLayout.LayoutParams blLp = new LinearLayout.LayoutParams(dp(18), dp(18));
+        blLp.rightMargin = dp(8);
+        titleLockup.addView(brandLogo, blLp);
+
         TextView headerTitle = new TextView(this);
-        headerTitle.setText("Inicio");
-        styleText(headerTitle, 17, COLOR_TEXT_WHITE, true);
-        headerTitle.setGravity(Gravity.CENTER);
-        header.addView(headerTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        headerTitle.setText("LIMEN EYES");
+        styleText(headerTitle, 16, COLOR_TEXT_WHITE, true);
+        headerTitle.setLetterSpacing(0.06f);
+        titleLockup.addView(headerTitle);
+
+        header.addView(titleLockup, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         LimenIcons.IconView btnRefresh = new LimenIcons.IconView(this, LimenIcons.ICON_REFRESH, COLOR_TEXT_WHITE);
         btnRefresh.setOnClickListener(v -> loadCamerasAndOpenHome());
@@ -826,16 +849,16 @@ public class MainActivity extends AppCompatActivity {
         );
         quickLp.bottomMargin = dp(14);
 
-        quickCard.addView(createQuickActionItem(LimenIcons.ICON_VIDEO, "#1D4ED8", "Vista previa", () -> showLiveViewScreen(null, null, null)));
-        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_4, "#0284C7", "Mosaico 4CH", () -> {
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_VIDEO, "#4F46E5", "Vista previa", () -> showLiveViewScreen(null, null, null)));
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_4, "#6366F1", "Mosaico 4CH", () -> {
             currentGridMode = 4;
             showLiveViewScreen(null, null, null);
         }));
-        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_9, "#4338CA", "Mosaico 9CH", () -> {
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_GRID_9, "#7C3AED", "Mosaico 9CH", () -> {
             currentGridMode = 9;
             showLiveViewScreen(null, null, null);
         }));
-        quickCard.addView(createQuickActionItem(LimenIcons.ICON_SERVER, "#0F766E", "Equipos", this::showDeviceManagerScreen));
+        quickCard.addView(createQuickActionItem(LimenIcons.ICON_SERVER, "#312E81", "Equipos", this::showDeviceManagerScreen));
 
         content.addView(quickCard, quickLp);
 
@@ -1995,6 +2018,7 @@ public class MainActivity extends AppCompatActivity {
             cellFrame.addView(plusIv, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
 
             ProgressBar spinner = new ProgressBar(this);
+            spinner.setIndeterminateTintList(ColorStateList.valueOf(Color.parseColor(COLOR_ACCENT_CYAN)));
             spinner.setVisibility(View.GONE);
             cellFrame.addView(spinner, new FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER));
 
@@ -2410,19 +2434,34 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
+        // Header Superior Oficial
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setBackgroundColor(Color.parseColor(COLOR_BG_HEADER));
+        header.setPadding(dp(16), dp(14), dp(16), dp(14));
+
+        TextView topTitle = new TextView(this);
+        topTitle.setText("Información y Cuenta");
+        styleText(topTitle, 17, COLOR_TEXT_WHITE, true);
+        topTitle.setGravity(Gravity.CENTER);
+        header.addView(topTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        page.addView(header);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
-        content.setPadding(dp(20), dp(42), dp(20), dp(24));
+        content.setPadding(dp(18), dp(24), dp(18), dp(24));
 
+        // Avatar Badge con Logotipo Limen
         FrameLayout avatar = new FrameLayout(this);
-        avatar.setBackground(roundBg(COLOR_BG_CARD, 20, COLOR_BORDER_DARK, 1));
-        LimenIcons.IconView userIcon = new LimenIcons.IconView(this, LimenIcons.ICON_SHIELD, COLOR_ACCENT_CYAN);
-        avatar.addView(userIcon, new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER));
+        avatar.setBackground(roundBg(COLOR_BG_CARD, 24, COLOR_BORDER_DARK, 1));
+        LimenIcons.IconView userIcon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        avatar.addView(userIcon, new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER));
 
-        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(74), dp(74));
+        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(76), dp(76));
         avLp.bottomMargin = dp(12);
         content.addView(avatar, avLp);
 
@@ -2432,30 +2471,99 @@ public class MainActivity extends AppCompatActivity {
         content.addView(uName);
 
         TextView uMail = new TextView(this);
-        uMail.setText(currentUserEmail + "  (" + currentUserRole.toUpperCase(Locale.ROOT) + ")");
+        uMail.setText(currentUserEmail + "  ·  " + currentUserRole.toUpperCase(Locale.ROOT));
         styleText(uMail, 12, COLOR_ACCENT_CYAN, false);
         LinearLayout.LayoutParams umLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
         );
         umLp.topMargin = dp(4);
-        umLp.bottomMargin = dp(26);
+        umLp.bottomMargin = dp(20);
         content.addView(uMail, umLp);
 
-        LinearLayout menuCard = new LinearLayout(this);
-        menuCard.setOrientation(LinearLayout.VERTICAL);
-        menuCard.setBackground(roundBg(COLOR_BG_CARD, 14, COLOR_BORDER_DARK, 1));
-        menuCard.setPadding(dp(16), dp(8), dp(16), dp(8));
-        LinearLayout.LayoutParams mcLp = new LinearLayout.LayoutParams(
+        // Tarjeta 1: Detalles de Cuenta y Conexión
+        LinearLayout statusCard = new LinearLayout(this);
+        statusCard.setOrientation(LinearLayout.VERTICAL);
+        statusCard.setBackground(roundBg(COLOR_BG_CARD, 14, COLOR_BORDER_DARK, 1));
+        statusCard.setPadding(dp(16), dp(8), dp(16), dp(8));
+        LinearLayout.LayoutParams scLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        mcLp.bottomMargin = dp(20);
+        scLp.bottomMargin = dp(16);
 
-        menuCard.addView(createProfileRow(LimenIcons.ICON_VIDEO, "Canales autorizados", allCameras.size() + " cámaras"));
-        menuCard.addView(createProfileRow(LimenIcons.ICON_GRID_9, "Vistas en directo", "1CH · 4CH · 9CH (16:9)"));
-        menuCard.addView(createProfileRow(LimenIcons.ICON_SHIELD, "Versión", "LIMEN EYES v2.4.1"));
+        statusCard.addView(createProfileRow(LimenIcons.ICON_VIDEO, "Canales autorizados", allCameras.size() + " cámaras"));
+        statusCard.addView(createProfileRow(LimenIcons.ICON_GRID_9, "Vistas en directo", "1CH · 4CH · 9CH (16:9)"));
+        statusCard.addView(createProfileRow(LimenIcons.ICON_SERVER, "Servidor Central", "eyes.limenseguridad.com"));
+        statusCard.addView(createProfileRow(LimenIcons.ICON_SHIELD, "Cifrado & Transporte", "TLS v1.3 · P2P Seguro"));
 
-        content.addView(menuCard, mcLp);
+        content.addView(statusCard, scLp);
 
+        // Tarjeta 2: Marco Institucional y Legal - "Desarrollada por LIMEN SEGURIDAD"
+        LinearLayout legalCard = new LinearLayout(this);
+        legalCard.setOrientation(LinearLayout.VERTICAL);
+        legalCard.setBackground(roundBg(COLOR_BG_CARD, 14, COLOR_BORDER_DARK, 1));
+        legalCard.setPadding(dp(18), dp(18), dp(18), dp(18));
+        LinearLayout.LayoutParams lcLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        lcLp.bottomMargin = dp(20);
+
+        LinearLayout legalHeader = new LinearLayout(this);
+        legalHeader.setOrientation(LinearLayout.HORIZONTAL);
+        legalHeader.setGravity(Gravity.CENTER_VERTICAL);
+        legalHeader.setPadding(0, 0, 0, dp(10));
+
+        LimenIcons.IconView brandLogo = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(20), dp(20));
+        blp.rightMargin = dp(8);
+        legalHeader.addView(brandLogo, blp);
+
+        TextView devLabel = new TextView(this);
+        devLabel.setText("Desarrollada por LIMEN SEGURIDAD");
+        styleText(devLabel, 14, COLOR_TEXT_WHITE, true);
+        legalHeader.addView(devLabel);
+        legalCard.addView(legalHeader);
+
+        TextView appVer = new TextView(this);
+        appVer.setText("LIMEN EYES v2.4.2 · Plataforma Profesional de Monitoreo");
+        styleText(appVer, 12, COLOR_ACCENT_CYAN, true);
+        appVer.setPadding(0, 0, 0, dp(8));
+        legalCard.addView(appVer);
+
+        TextView appDesc = new TextView(this);
+        appDesc.setText("Solución integral para transmisión segura de video en tiempo real, auditoría multicámara y supervisión perimetral de instalaciones protegidas.");
+        styleText(appDesc, 12, COLOR_TEXT_GRAY, false);
+        appDesc.setLineSpacing(dp(2), 1.15f);
+        appDesc.setPadding(0, 0, 0, dp(12));
+        legalCard.addView(appDesc);
+
+        View div = new View(this);
+        div.setBackgroundColor(Color.parseColor(COLOR_BORDER_DARK));
+        legalCard.addView(div, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+
+        TextView legalTitle = new TextView(this);
+        legalTitle.setText("AVISO LEGAL & PROTECCIÓN DE DATOS");
+        styleText(legalTitle, 11, COLOR_TEXT_MUTED, true);
+        legalTitle.setLetterSpacing(0.08f);
+        legalTitle.setPadding(0, dp(12), 0, dp(6));
+        legalCard.addView(legalTitle);
+
+        TextView legalText = new TextView(this);
+        legalText.setText("En cumplimiento de la normativa de Protección de Datos Personales (Ley N° 25.326 y estándares de seguridad de videovigilancia), el acceso al material audiovisual y registros telemétricos está estrictamente reservado al titular del servicio y operadores acreditados para fines exclusivos de prevención y resguardo patrimonial.\n\nQueda prohibida la reproducción no autorizada, divulgación o manipulación de imágenes fuera del marco legal y contractual establecido.");
+        styleText(legalText, 11, COLOR_TEXT_MUTED, false);
+        legalText.setLineSpacing(dp(2), 1.15f);
+        legalText.setPadding(0, 0, 0, dp(14));
+        legalCard.addView(legalText);
+
+        TextView copyRight = new TextView(this);
+        copyRight.setText("© 2026 LIMEN SEGURIDAD · Todos los derechos reservados.\nCentral de Soporte: soporte@limenseguridad.com");
+        styleText(copyRight, 11, COLOR_ACCENT_CYAN, false);
+        copyRight.setGravity(Gravity.CENTER);
+        copyRight.setLineSpacing(dp(2), 1.15f);
+        legalCard.addView(copyRight);
+
+        content.addView(legalCard, lcLp);
+
+        // Botón Cerrar Sesión
         Button btnLogout = new Button(this);
         btnLogout.setText("Cerrar sesión");
         styleText(btnLogout, 14, "#FCA5A5", true);

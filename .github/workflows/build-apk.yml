@@ -37,22 +37,22 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.2.0 --yes || true
-        git push origin :refs/tags/v2.2.0 || true
+        gh release delete v2.4.2 --yes || true
+        git push origin :refs/tags/v2.4.2 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.2.0
+    - name: Create GitHub Release v2.4.2
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.2.0
-        name: "LIMEN EYES v2.2.0 - Interfaz DMSS / EasyViewer, Home con Capturas 16:9 y Selección Manual"
+        tag_name: v2.4.2
+        name: "LIMEN EYES v2.4.2 - Paleta Oficial Limen, Logotipos e Información Legal"
         body: |
-          ### 📱 LIMEN EYES v2.2.0 - Estética DMSS / EasyViewer Pro
-          - **Pantalla de Inicio (Home) con selección de dispositivo**: No inicia streams automáticamente al abrir la app.
-          - **Tarjetas por Dispositivo con Capturas 16:9**: Muestra la última imagen capturada de cada cámara con su etiqueta (`CAM 1`, `CAM 2`, etc.).
-          - **Reproductor en Vivo 16:9 bajo demanda**: Toca una cámara para verla en 16:9 individual, o toca el botón `(▶)` del dispositivo para abrir hasta 4 cámaras en simultáneo.
-          - **Soporte nativo H.265 (HEVC) + H.264**: Reproducción instantánea tanto en grabadores modernos (Fiorini) como clásicos (Novello).
+          ### 📱 LIMEN EYES v2.4.2 - Plataforma Oficial de Monitoreo
+          - **Paleta Oficial Limen Seguridad**: Dark bunker obsidian (#080B14), índigo (#818CF8 / #4F46E5) y verde esmeralda para estados online.
+          - **Logotipo Oficial Vectorial**: Escudo de seguridad y lente biométrica central incorporado en TopBar, Login y sección de Cuenta.
+          - **Información Legal y Cumplimiento**: Atribución 'Desarrollada por LIMEN SEGURIDAD', Copyright © 2026, marco normativo Ley N° 25.326 y canales de soporte directo.
+          - **Soporte H.265 / HEVC y H.264 nativo**: Reproducción fluida y arquitectura P2P de baja latencia conectada a eyes.limenseguridad.com.
         files: |
           app/build/outputs/apk/debug/app-debug.apk
       env:
