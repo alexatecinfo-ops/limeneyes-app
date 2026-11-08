@@ -17,8 +17,23 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
-    buildTypes {
+    signingConfigs {
         release {
+            storeFile file('limeneyes.jks')
+            storePassword 'LimenSeguridad2026!'
+            keyAlias 'limeneyes'
+            keyPassword 'LimenSeguridad2026!'
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
+        release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
