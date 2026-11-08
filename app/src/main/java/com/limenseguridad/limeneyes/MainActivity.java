@@ -42,6 +42,14 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.core.content.FileProvider;
+import android.os.Build;
+import android.provider.Settings;
+import android.content.pm.PackageInfo;
+import java.io.InputStream;
+import java.io.FileOutputStream;
+import java.io.File;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -743,6 +751,7 @@ public class MainActivity extends AppCompatActivity {
                     allCameras.clear();
                     allCameras.addAll(loaded);
                     logAppEvent("Sincronizados " + allCameras.size() + " canales en línea");
+                    checkForUpdates(false);
                     if (currentTab == 0) showHomeScreen();
                 });
             } catch (Exception e) {
@@ -2494,6 +2503,7 @@ public class MainActivity extends AppCompatActivity {
         statusCard.addView(createProfileRow(LimenIcons.ICON_GRID_9, "Vistas en directo", "1CH · 4CH · 9CH (16:9)"));
         statusCard.addView(createProfileRow(LimenIcons.ICON_SERVER, "Servidor Central", "eyes.limenseguridad.com"));
         statusCard.addView(createProfileRow(LimenIcons.ICON_SHIELD, "Cifrado & Transporte", "TLS v1.3 · P2P Seguro"));
+        statusCard.addView(createProfileRow(LimenIcons.ICON_REFRESH, "Actualizaciones OTA", "Buscar versión (Tocar)", () -> checkForUpdates(true)));
 
         content.addView(statusCard, scLp);
 
@@ -2579,7 +2589,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private View createProfileRow(int iconType, String left, String right) {
+        return createProfileRow(iconType, left, right, null);
+    }
+
+    private View createProfileRow(int iconType, String left, String right, final Runnable action) {
         LinearLayout row = new LinearLayout(this);
+        if (action != null) {
+            row.setOnClickListener(v -> action.run());
+        }
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(4), dp(14), dp(4), dp(14));
@@ -2998,5 +3015,213 @@ public class MainActivity extends AppCompatActivity {
         }
         res.body = sb.toString();
         return res;
+    }
+
+    // =========================================================================
+    // AUTO-ACTUALIZADOR OTA LIMEN SEGURIDAD (SIN PLAY STORE)
+    // =========================================================================
+    private void checkForUpdates(final boolean userInitiated) {
+        executor.execute(() -> {
+            try {
+                int currentCode = 11;
+                String currentName = "2.4.3";
+                try {
+                    PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                    currentCode = pInfo.versionCode;
+                    currentName = pInfo.versionName;
+                } catch (Exception ignored) {}
+
+                HttpResponse resp = httpGet(BASE_URL + "/api/app-version", null);
+                if (resp.code != 200 || resp.body == null || resp.body.isEmpty()) {
+                    if (userInitiated) {
+                        mainHandler.post(() -> Toast.makeText(this, "No se pudo consultar el servidor de actualizaciones", Toast.LENGTH_SHORT).show());
+                    }
+                    return;
+                }
+
+                JSONObject json = new JSONObject(resp.body);
+                int serverCode = json.optInt("versionCode", 0);
+                String serverName = json.optString("versionName", "2.4.3");
+                String downloadUrl = json.optString("downloadUrl", "https://github.com/alexatecinfo-ops/limeneyes-app/releases/latest/download/app-debug.apk");
+                String notes = json.optString("releaseNotes", "Mejoras de rendimiento y seguridad.");
+
+                final String cName = currentName;
+                if (serverCode > currentCode) {
+                    mainHandler.post(() -> promptUpdateDialog(serverName, notes, downloadUrl));
+                } else if (userInitiated) {
+                    mainHandler.post(() -> Toast.makeText(this, "LIMEN EYES está al día (v" + cName + ")", Toast.LENGTH_SHORT).show());
+                }
+            } catch (Exception e) {
+                if (userInitiated) {
+                    mainHandler.post(() -> Toast.makeText(this, "Error al comprobar actualizaciones: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                }
+            }
+        });
+    }
+
+    private void promptUpdateDialog(String newVer, String notes, String downloadUrl) {
+        final Dialog dialog = createCustomLimenDialog();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(22), dp(20), dp(22), dp(18));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, 0, 0, dp(12));
+
+        LimenIcons.IconView icon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(24), dp(24));
+        iLp.rightMargin = dp(10);
+        head.addView(icon, iLp);
+
+        TextView title = new TextView(this);
+        title.setText("Actualización Disponible");
+        styleText(title, 16, COLOR_TEXT_WHITE, true);
+        head.addView(title);
+        card.addView(head);
+
+        TextView verTag = new TextView(this);
+        verTag.setText("LIMEN EYES v" + newVer);
+        styleText(verTag, 13, COLOR_ACCENT_CYAN, true);
+        verTag.setPadding(0, 0, 0, dp(8));
+        card.addView(verTag);
+
+        TextView notesTv = new TextView(this);
+        notesTv.setText(notes);
+        styleText(notesTv, 12, COLOR_TEXT_GRAY, false);
+        notesTv.setLineSpacing(dp(2), 1.15f);
+        notesTv.setPadding(0, 0, 0, dp(16));
+        card.addView(notesTv);
+
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(false);
+        progress.setMax(100);
+        progress.setProgress(0);
+        progress.setVisibility(View.GONE);
+        progress.setProgressTintList(ColorStateList.valueOf(Color.parseColor(COLOR_ACCENT_CYAN)));
+        LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(10));
+        pLp.bottomMargin = dp(14);
+        card.addView(progress, pLp);
+
+        TextView statusTv = new TextView(this);
+        statusTv.setText("");
+        styleText(statusTv, 11, COLOR_TEXT_MUTED, false);
+        statusTv.setVisibility(View.GONE);
+        statusTv.setPadding(0, 0, 0, dp(10));
+        card.addView(statusTv);
+
+        LinearLayout btns = new LinearLayout(this);
+        btns.setOrientation(LinearLayout.HORIZONTAL);
+        btns.setGravity(Gravity.END);
+
+        Button btnLater = new Button(this);
+        btnLater.setText("Más tarde");
+        styleText(btnLater, 13, COLOR_TEXT_GRAY, false);
+        btnLater.setAllCaps(false);
+        btnLater.setBackground(roundBg(COLOR_BG_ELEVATED, 10, COLOR_BORDER_DARK, 1));
+        btnLater.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout.LayoutParams blLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42));
+        blLp.rightMargin = dp(8);
+        btns.addView(btnLater, blLp);
+
+        Button btnUpdate = new Button(this);
+        btnUpdate.setText("Actualizar ahora");
+        styleText(btnUpdate, 13, COLOR_TEXT_WHITE, true);
+        btnUpdate.setAllCaps(false);
+        btnUpdate.setBackground(roundBg(COLOR_BTN_BLUE, 10, null, 0));
+        btnUpdate.setOnClickListener(v -> {
+            btnUpdate.setEnabled(false);
+            btnLater.setVisibility(View.GONE);
+            progress.setVisibility(View.VISIBLE);
+            statusTv.setVisibility(View.VISIBLE);
+            statusTv.setText("Iniciando descarga...");
+            startApkDownload(downloadUrl, progress, statusTv, dialog);
+        });
+        btns.addView(btnUpdate, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+
+        card.addView(btns);
+        dialog.setContentView(card);
+        dialog.show();
+    }
+
+    private void startApkDownload(String apkUrl, ProgressBar progressBar, TextView statusTv, Dialog dialog) {
+        executor.execute(() -> {
+            try {
+                URL url = new URL(apkUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(true);
+                conn.connect();
+
+                int code = conn.getResponseCode();
+                if (code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_MOVED_PERM || code == 307 || code == 308) {
+                    String newUrl = conn.getHeaderField("Location");
+                    conn.disconnect();
+                    conn = (HttpURLConnection) new URL(newUrl).openConnection();
+                    conn.connect();
+                }
+
+                int fileLength = conn.getContentLength();
+                File cacheDir = getCacheDir();
+                File apkFile = new File(cacheDir, "limeneyes_update.apk");
+                if (apkFile.exists()) apkFile.delete();
+
+                InputStream input = conn.getInputStream();
+                FileOutputStream output = new FileOutputStream(apkFile);
+
+                byte[] data = new byte[8192];
+                long total = 0;
+                int count;
+                while ((count = input.read(data)) != -1) {
+                    total += count;
+                    if (fileLength > 0) {
+                        int progress = (int) (total * 100 / fileLength);
+                        mainHandler.post(() -> {
+                            progressBar.setProgress(progress);
+                            statusTv.setText("Descargando actualización: " + progress + "%");
+                        });
+                    }
+                    output.write(data, 0, count);
+                }
+                output.flush();
+                output.close();
+                input.close();
+                conn.disconnect();
+
+                mainHandler.post(() -> {
+                    dialog.dismiss();
+                    installApk(apkFile);
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    statusTv.setText("Error al descargar: " + e.getMessage());
+                    Toast.makeText(this, "Fallo al descargar actualización: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private void installApk(File apkFile) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!getPackageManager().canRequestPackageInstalls()) {
+                    Toast.makeText(this, "Autorice a Limen Eyes para instalar la actualización", Toast.LENGTH_LONG).show();
+                    Intent permIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                    permIntent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(permIntent);
+                    return;
+                }
+            }
+
+            Uri apkUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", apkFile);
+            Intent install = new Intent(Intent.ACTION_VIEW);
+            install.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(install);
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al iniciar instalador: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 }
