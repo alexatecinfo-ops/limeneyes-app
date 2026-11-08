@@ -3460,10 +3460,7 @@ public class MainActivity extends AppCompatActivity {
         card.addView(head);
 
         TextView msg = new TextView(this);
-        msg.setText(propName + " te ha compartido el dispositivo:
-"" + eqName + ""
-
-¿Deseas aceptar la visualización de estas cámaras en tu cuenta?");
+        msg.setText(propName + " te ha compartido el dispositivo:\n\"" + eqName + "\"\n\n¿Deseas aceptar la visualización de estas cámaras en tu cuenta?");
         styleText(msg, 13, COLOR_TEXT_GRAY, false);
         msg.setLineSpacing(dp(2), 1.15f);
         msg.setPadding(0, 0, 0, dp(20));
