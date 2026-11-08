@@ -753,6 +753,7 @@ public class MainActivity extends AppCompatActivity {
                     logAppEvent("Sincronizados " + allCameras.size() + " canales en línea");
                     checkForUpdates(false);
                     if (currentTab == 0) showHomeScreen();
+                    checkPendingInvitations();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error obteniendo cámaras", e);
@@ -1204,6 +1205,17 @@ public class MainActivity extends AppCompatActivity {
         View div = new View(this);
         div.setBackgroundColor(Color.parseColor(COLOR_BORDER_DARK));
         sheet.addView(div, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+
+        // 0. Compartir dispositivo
+        sheet.addView(createModalActionRow(
+                LimenIcons.ICON_USER,
+                "Compartir dispositivo",
+                "Invitar a otro usuario a ver este equipo con permisos específicos",
+                COLOR_ACCENT_CYAN,
+                v -> {
+                    dialog.dismiss();
+                    promptShareDeviceModal(groupTitle, cams);
+                }));
 
         // 1. Detalles del dispositivo (Como en Imagen 3 -> lleva a Imagen 2)
         sheet.addView(createModalActionRow(
@@ -3223,5 +3235,276 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Toast.makeText(this, "Error al iniciar instalador: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    // =========================================================================
+    // COMPARTIR DISPOSITIVOS ENTRE USUARIOS & ACEPTAR INVITACIONES PENDIENTES
+    // =========================================================================
+    private void promptShareDeviceModal(String groupTitle, List<CameraItem> cams) {
+        final Dialog dialog = createCustomLimenDialog();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(20), dp(18), dp(20), dp(16));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, 0, 0, dp(12));
+
+        LimenIcons.IconView ic = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(22), dp(22));
+        icLp.rightMargin = dp(8);
+        head.addView(ic, icLp);
+
+        TextView title = new TextView(this);
+        title.setText("Compartir " + groupTitle);
+        styleText(title, 16, COLOR_TEXT_WHITE, true);
+        head.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        FrameLayout closeBtn = new FrameLayout(this);
+        closeBtn.setPadding(dp(4), dp(4), dp(4), dp(4));
+        closeBtn.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CLOSE, COLOR_TEXT_GRAY),
+                new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        head.addView(closeBtn);
+        card.addView(head);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+
+        TextView lblEmail = new TextView(this);
+        lblEmail.setText("Cuenta de Google del destinatario:");
+        styleText(lblEmail, 12, COLOR_TEXT_GRAY, false);
+        lblEmail.setPadding(0, dp(6), 0, dp(4));
+        body.addView(lblEmail);
+
+        EditText inputEmail = new EditText(this);
+        inputEmail.setHint("ejemplo@gmail.com");
+        inputEmail.setHintTextColor(Color.parseColor(COLOR_TEXT_MUTED));
+        inputEmail.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        inputEmail.setBackground(roundBg(COLOR_BG_INPUT, 10, COLOR_BORDER_DARK, 1));
+        inputEmail.setPadding(dp(12), dp(10), dp(12), dp(10));
+        styleText(inputEmail, 13, COLOR_TEXT_WHITE, false);
+        LinearLayout.LayoutParams ieLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ieLp.bottomMargin = dp(16);
+        body.addView(inputEmail, ieLp);
+
+        TextView lblCh = new TextView(this);
+        lblCh.setText("Canales autorizados:");
+        styleText(lblCh, 12, COLOR_TEXT_GRAY, true);
+        lblCh.setPadding(0, 0, 0, dp(6));
+        body.addView(lblCh);
+
+        final List<android.widget.CheckBox> channelBoxes = new ArrayList<>();
+        for (CameraItem c : cams) {
+            android.widget.CheckBox chk = new android.widget.CheckBox(this);
+            chk.setText("CH " + c.canal + " · " + c.getCleanName());
+            chk.setChecked(true);
+            chk.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+            chk.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            chk.setTag(c.canal);
+            channelBoxes.add(chk);
+            body.addView(chk);
+        }
+
+        TextView lblPerms = new TextView(this);
+        lblPerms.setText("Permisos de interacción:");
+        styleText(lblPerms, 12, COLOR_TEXT_GRAY, true);
+        lblPerms.setPadding(0, dp(14), 0, dp(6));
+        body.addView(lblPerms);
+
+        android.widget.CheckBox chkLive = new android.widget.CheckBox(this);
+        chkLive.setText("Ver en directo (Live View)");
+        chkLive.setChecked(true);
+        chkLive.setEnabled(false);
+        chkLive.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+        chkLive.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        body.addView(chkLive);
+
+        android.widget.CheckBox chkPlayback = new android.widget.CheckBox(this);
+        chkPlayback.setText("Reproducir grabaciones pasadas");
+        chkPlayback.setChecked(true);
+        chkPlayback.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+        chkPlayback.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        body.addView(chkPlayback);
+
+        android.widget.CheckBox chkPtz = new android.widget.CheckBox(this);
+        chkPtz.setText("Control de movimiento PTZ");
+        chkPtz.setChecked(false);
+        chkPtz.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+        chkPtz.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        body.addView(chkPtz);
+
+        android.widget.CheckBox chkAlarm = new android.widget.CheckBox(this);
+        chkAlarm.setText("Notificaciones y alarmas perimetrales");
+        chkAlarm.setChecked(false);
+        chkAlarm.setTextColor(Color.parseColor(COLOR_TEXT_WHITE));
+        chkAlarm.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        body.addView(chkAlarm);
+
+        Button btnSend = new Button(this);
+        btnSend.setText("Enviar invitación");
+        styleText(btnSend, 14, COLOR_TEXT_WHITE, true);
+        btnSend.setAllCaps(false);
+        btnSend.setBackground(roundBg(COLOR_BTN_BLUE, 10, null, 0));
+        LinearLayout.LayoutParams bsLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        bsLp.topMargin = dp(20);
+        btnSend.setOnClickListener(v -> {
+            String targetEmail = inputEmail.getText().toString().trim().toLowerCase();
+            if (!targetEmail.contains("@") || !targetEmail.contains(".")) {
+                Toast.makeText(this, "Ingrese un email de Google válido", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            List<Integer> selectedChannels = new ArrayList<>();
+            for (android.widget.CheckBox chk : channelBoxes) {
+                if (chk.isChecked()) selectedChannels.add((Integer) chk.getTag());
+            }
+            if (selectedChannels.isEmpty()) {
+                Toast.makeText(this, "Debe seleccionar al menos un canal", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            btnSend.setEnabled(false);
+            btnSend.setText("Enviando...");
+
+            executor.execute(() -> {
+                try {
+                    JSONObject bodyJson = new JSONObject();
+                    bodyJson.put("equipo_sn", cams.get(0).sn);
+                    bodyJson.put("equipo_nombre", groupTitle);
+                    bodyJson.put("invitado_email", targetEmail);
+
+                    JSONArray canArr = new JSONArray();
+                    for (int ch : selectedChannels) canArr.put(ch);
+                    bodyJson.put("canales", canArr);
+
+                    JSONObject permJson = new JSONObject();
+                    permJson.put("live", true);
+                    permJson.put("playback", chkPlayback.isChecked());
+                    permJson.put("ptz", chkPtz.isChecked());
+                    permJson.put("alarm", chkAlarm.isChecked());
+                    bodyJson.put("permisos", permJson);
+
+                    HttpResponse r = httpPostJson(BASE_URL + "/api/compartir", bodyJson.toString(), authToken);
+                    mainHandler.post(() -> {
+                        dialog.dismiss();
+                        if (r.code == 200) {
+                            Toast.makeText(this, "Invitación enviada a " + targetEmail, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "Error al compartir: " + r.body, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (Exception ex) {
+                    mainHandler.post(() -> {
+                        btnSend.setEnabled(true);
+                        btnSend.setText("Enviar invitación");
+                        Toast.makeText(this, "Fallo de conexión", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            });
+        });
+        body.addView(btnSend, bsLp);
+
+        scroll.addView(body);
+        card.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(420)));
+        dialog.setContentView(card);
+        dialog.show();
+    }
+
+    private void checkPendingInvitations() {
+        if (authToken == null || authToken.isEmpty()) return;
+        executor.execute(() -> {
+            try {
+                HttpResponse resp = httpGet(BASE_URL + "/api/mis-invitaciones", authToken);
+                if (resp.code == 200 && resp.body != null && !resp.body.equals("[]")) {
+                    JSONArray arr = new JSONArray(resp.body);
+                    if (arr.length() > 0) {
+                        JSONObject inv = arr.getJSONObject(0);
+                        mainHandler.post(() -> promptAcceptInvitationDialog(inv));
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void promptAcceptInvitationDialog(JSONObject inv) {
+        final Dialog dialog = createCustomLimenDialog();
+
+        int invId = inv.optInt("id");
+        String propName = inv.optString("propietario_nombre", "Un cliente de Limen");
+        String eqName = inv.optString("equipo_nombre", "Dispositivo Limen");
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(22), dp(20), dp(22), dp(18));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, 0, 0, dp(12));
+
+        LimenIcons.IconView icon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(24), dp(24));
+        iLp.rightMargin = dp(10);
+        head.addView(icon, iLp);
+
+        TextView title = new TextView(this);
+        title.setText("Dispositivo Compartido");
+        styleText(title, 16, COLOR_TEXT_WHITE, true);
+        head.addView(title);
+        card.addView(head);
+
+        TextView msg = new TextView(this);
+        msg.setText(propName + " te ha compartido el dispositivo:
+"" + eqName + ""
+
+¿Deseas aceptar la visualización de estas cámaras en tu cuenta?");
+        styleText(msg, 13, COLOR_TEXT_GRAY, false);
+        msg.setLineSpacing(dp(2), 1.15f);
+        msg.setPadding(0, 0, 0, dp(20));
+        card.addView(msg);
+
+        LinearLayout btns = new LinearLayout(this);
+        btns.setOrientation(LinearLayout.HORIZONTAL);
+        btns.setGravity(Gravity.END);
+
+        Button btnReject = new Button(this);
+        btnReject.setText("Rechazar");
+        styleText(btnReject, 13, "#FCA5A5", false);
+        btnReject.setAllCaps(false);
+        btnReject.setBackground(roundBg("#2A161B", 10, "#EF4444", 1));
+        btnReject.setOnClickListener(v -> {
+            dialog.dismiss();
+            executor.execute(() -> httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/rechazar", "{}", authToken));
+        });
+        LinearLayout.LayoutParams brLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42));
+        brLp.rightMargin = dp(8);
+        btns.addView(btnReject, brLp);
+
+        Button btnAccept = new Button(this);
+        btnAccept.setText("Aceptar visualización");
+        styleText(btnAccept, 13, COLOR_TEXT_WHITE, true);
+        btnAccept.setAllCaps(false);
+        btnAccept.setBackground(roundBg(COLOR_BTN_BLUE, 10, null, 0));
+        btnAccept.setOnClickListener(v -> {
+            dialog.dismiss();
+            executor.execute(() -> {
+                HttpResponse r = httpPostJson(BASE_URL + "/api/invitaciones/" + invId + "/aceptar", "{}", authToken);
+                mainHandler.post(() -> {
+                    Toast.makeText(this, "Dispositivo aceptado correctamente", Toast.LENGTH_SHORT).show();
+                    loadCamerasAndOpenHome();
+                });
+            });
+        });
+        btns.addView(btnAccept, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+
+        card.addView(btns);
+        dialog.setContentView(card);
+        dialog.show();
     }
 }
