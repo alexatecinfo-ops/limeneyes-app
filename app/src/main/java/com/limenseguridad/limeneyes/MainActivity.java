@@ -44,6 +44,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 import android.os.Build;
+import android.accounts.AccountManager;
 import android.provider.Settings;
 import android.content.pm.PackageInfo;
 import java.io.InputStream;
@@ -99,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.4.5";
+    private static final String APP_VERSION_NAME = "2.4.6";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -168,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
 
     private GoogleSignInClient googleSignInClient;
     private ActivityResultLauncher<Intent> googleSignInLauncher;
+    private ActivityResultLauncher<Intent> accountChooserLauncher;
     private TextView statusErrorText;
 
     public static class CameraItem {
@@ -257,6 +259,20 @@ public class MainActivity extends AppCompatActivity {
             rootContainer.setBackgroundColor(Color.parseColor(COLOR_BG_MAIN));
 
             try {
+                accountChooserLauncher = registerForActivityResult(
+                        new ActivityResultContracts.StartActivityForResult(),
+                        result -> {
+                            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                                String email = result.getData().getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+                                if (email != null && !email.isEmpty() && email.contains("@")) {
+                                    verifyGoogleEmailOnServer(email, email.split("@")[0]);
+                                    return;
+                                }
+                            }
+                            promptGoogleEmailModal();
+                        }
+                );
+
                 googleSignInLauncher = registerForActivityResult(
                         new ActivityResultContracts.StartActivityForResult(),
                         result -> {
@@ -709,18 +725,33 @@ public class MainActivity extends AppCompatActivity {
 
     private void startNativeGoogleSignIn(String typedEmailFallback) {
         try {
-            if (googleSignInClient != null && googleSignInLauncher != null) {
-                googleSignInClient.signOut().addOnCompleteListener(task -> {
-                    Intent signInIntent = googleSignInClient.getSignInIntent();
-                    googleSignInLauncher.launch(signInIntent);
-                });
-            } else if (!typedEmailFallback.isEmpty() && typedEmailFallback.contains("@")) {
-                verifyGoogleEmailOnServer(typedEmailFallback, typedEmailFallback.split("@")[0]);
-            } else {
+            Intent intent = AccountManager.newChooseAccountIntent(
+                    null,
+                    null,
+                    new String[]{"com.google"},
+                    false,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            accountChooserLauncher.launch(intent);
+        } catch (Throwable t) {
+            Log.w(TAG, "AccountManager chooser fallback", t);
+            try {
+                if (googleSignInClient != null && googleSignInLauncher != null) {
+                    googleSignInClient.signOut().addOnCompleteListener(task -> {
+                        Intent signInIntent = googleSignInClient.getSignInIntent();
+                        googleSignInLauncher.launch(signInIntent);
+                    });
+                } else if (!typedEmailFallback.isEmpty() && typedEmailFallback.contains("@")) {
+                    verifyGoogleEmailOnServer(typedEmailFallback, typedEmailFallback.split("@")[0]);
+                } else {
+                    promptGoogleEmailModal();
+                }
+            } catch (Throwable t2) {
                 promptGoogleEmailModal();
             }
-        } catch (Throwable t) {
-            promptGoogleEmailModal();
         }
     }
 
