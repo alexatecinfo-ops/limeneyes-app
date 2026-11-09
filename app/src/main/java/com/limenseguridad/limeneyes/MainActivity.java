@@ -4063,7 +4063,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Alternar vista Grilla 2x2 / 1x1
         FrameLayout btnFull = new FrameLayout(this);
-        playbackLayoutToggleIcon = new LimenIcons.IconView(this, isPlaybackSingleCell ? LimenIcons.ICON_GRID : LimenIcons.ICON_FULLSCREEN, COLOR_TEXT_WHITE);
+        playbackLayoutToggleIcon = new LimenIcons.IconView(this, isPlaybackSingleCell ? LimenIcons.ICON_GRID_4 : LimenIcons.ICON_GRID_1, COLOR_TEXT_WHITE);
         btnFull.addView(playbackLayoutToggleIcon, new FrameLayout.LayoutParams(dp(19), dp(19), Gravity.CENTER));
         btnFull.setOnClickListener(v -> togglePlaybackGridMode(selectedPlaybackCell));
         primaryControls.addView(btnFull, new LinearLayout.LayoutParams(0, dp(34), 1f));
@@ -4608,7 +4608,7 @@ public class MainActivity extends AppCompatActivity {
         if (targetCell < 0 || targetCell > 3) targetCell = 0;
 
         if (playbackLayoutToggleIcon != null) {
-            playbackLayoutToggleIcon.setIconType(isPlaybackSingleCell ? LimenIcons.ICON_GRID : LimenIcons.ICON_FULLSCREEN);
+            playbackLayoutToggleIcon.setIconType(isPlaybackSingleCell ? LimenIcons.ICON_GRID_4 : LimenIcons.ICON_GRID_1);
         }
 
         if (isPlaybackSingleCell) {
