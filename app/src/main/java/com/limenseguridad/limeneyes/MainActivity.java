@@ -1,6 +1,8 @@
 package com.limenseguridad.limeneyes;
 
 import android.app.Dialog;
+import android.app.DatePickerDialog;
+import java.util.Calendar;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.Intent;
@@ -2822,7 +2824,8 @@ public class MainActivity extends AppCompatActivity {
         nav.setPadding(dp(8), dp(8), dp(8), dp(8));
 
         nav.addView(createNavTab(LimenIcons.ICON_HOME, "Inicio", currentTab == 0, this::showHomeScreen));
-        nav.addView(createNavTab(LimenIcons.ICON_VIDEO, "Vista previa", currentTab == 1, () -> showLiveViewScreen(null, null, activeLiveGroupFilter)));
+        nav.addView(createNavTab(LimenIcons.ICON_VIDEO, "En directo", currentTab == 1, () -> showLiveViewScreen(null, null, activeLiveGroupFilter)));
+        nav.addView(createNavTab(LimenIcons.ICON_CALENDAR, "Grabaciones", currentTab == 4, () -> showPlaybackScreen(null)));
         nav.addView(createNavTab(LimenIcons.ICON_SERVER, "Equipos", currentTab == 2, this::showDeviceManagerScreen));
         nav.addView(createNavTab(LimenIcons.ICON_USER, "Cuenta", currentTab == 3, this::showProfileScreen));
 
@@ -3087,6 +3090,12 @@ public class MainActivity extends AppCompatActivity {
                 h.player = null;
             }
         }
+        if (playbackPlayer != null) {
+            try {
+                playbackPlayer.release();
+            } catch (Throwable ignored) {}
+            playbackPlayer = null;
+        }
     }
 
     private void reportCrashToServer(String context, Throwable t) {
@@ -3227,7 +3236,7 @@ public class MainActivity extends AppCompatActivity {
                     currentName = pInfo.versionName;
                 } catch (Exception ignored) {}
 
-                HttpResponse resp = httpGet(BASE_URL + "/api/app-version", null);
+                HttpResponse resp = httpGet(BASE_URL + "/api/app-version?channel=beta", null);
                 if (resp.code != 200 || resp.body == null || resp.body.isEmpty()) {
                     if (userInitiated) {
                         mainHandler.post(() -> Toast.makeText(this, "No se pudo consultar el servidor de actualizaciones", Toast.LENGTH_SHORT).show());
@@ -3701,4 +3710,508 @@ public class MainActivity extends AppCompatActivity {
         dialog.setContentView(card);
         dialog.show();
     }
+
+    // =========================================================================
+    // 7. SISTEMA DE REPRODUCCIÓN DE GRABACIONES (PLAYBACK / HDD)
+    // =========================================================================
+    public static class RecordingInterval {
+        public String start;
+        public String end;
+        public String startTime;
+        public String endTime;
+        public int startSeconds;
+        public int endSeconds;
+        public int duration;
+        public String type; // motion or regular
+        public String streamUrl;
+    }
+
+    private ExoPlayer playbackPlayer;
+    private PlayerView playbackPlayerView;
+    private CameraItem activePlaybackCamera;
+    private String activePlaybackDate;
+    private final List<RecordingInterval> playbackIntervals = new ArrayList<>();
+    private TextView playbackHeaderSub;
+    private TextView playbackDateLabel;
+    private TextView playbackStatusText;
+    private ProgressBar playbackSpinner;
+    private LinearLayout playbackIntervalsContainer;
+    private FrameLayout playbackTimelineBar;
+    private TextView playbackCurrentTimeOverlay;
+    private RecordingInterval currentlyPlayingInterval = null;
+
+    private void showPlaybackScreen(CameraItem camToSelect) {
+        currentTab = 4;
+        releaseAllPlayers();
+
+        if (camToSelect != null) {
+            activePlaybackCamera = camToSelect;
+        } else if (activePlaybackCamera == null && !allCameras.isEmpty()) {
+            activePlaybackCamera = allCameras.get(0);
+        }
+
+        if (activePlaybackDate == null) {
+            activePlaybackDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        }
+
+        rootContainer.removeAllViews();
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor(COLOR_BG_MAIN));
+        page.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        // 1. TOP BAR
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setBackgroundColor(Color.parseColor(COLOR_BG_HEADER));
+        topBar.setPadding(dp(12), dp(10), dp(14), dp(10));
+
+        FrameLayout btnBackWrap = new FrameLayout(this);
+        btnBackWrap.setPadding(dp(8), dp(6), dp(8), dp(6));
+        btnBackWrap.addView(new LimenIcons.IconView(this, LimenIcons.ICON_BACK, COLOR_TEXT_WHITE),
+                new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+        btnBackWrap.setOnClickListener(v -> showHomeScreen());
+        topBar.addView(btnBackWrap);
+
+        LinearLayout centerCol = new LinearLayout(this);
+        centerCol.setOrientation(LinearLayout.VERTICAL);
+        centerCol.setGravity(Gravity.CENTER);
+        centerCol.setOnClickListener(v -> {
+            showCustomCameraPickerModal(null, allCameras, cam -> {
+                activePlaybackCamera = cam;
+                updatePlaybackHeader();
+                loadPlaybackTimeline();
+            });
+        });
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Grabaciones");
+        styleText(titleTv, 16, COLOR_TEXT_WHITE, true);
+        titleTv.setGravity(Gravity.CENTER);
+        centerCol.addView(titleTv);
+
+        playbackHeaderSub = new TextView(this);
+        styleText(playbackHeaderSub, 11, COLOR_ACCENT_CYAN, false);
+        playbackHeaderSub.setGravity(Gravity.CENTER);
+        centerCol.addView(playbackHeaderSub);
+        updatePlaybackHeader();
+
+        topBar.addView(centerCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        // Boton Selector de Fecha
+        LinearLayout btnDate = new LinearLayout(this);
+        btnDate.setOrientation(LinearLayout.HORIZONTAL);
+        btnDate.setGravity(Gravity.CENTER_VERTICAL);
+        btnDate.setBackground(roundBg(COLOR_BG_ELEVATED, 8, COLOR_BORDER_DARK, 1));
+        btnDate.setPadding(dp(10), dp(6), dp(10), dp(6));
+        btnDate.setOnClickListener(v -> showDatePickerModal());
+
+        btnDate.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CALENDAR, COLOR_ACCENT_CYAN),
+                new LinearLayout.LayoutParams(dp(16), dp(16)));
+
+        playbackDateLabel = new TextView(this);
+        playbackDateLabel.setText(activePlaybackDate);
+        styleText(playbackDateLabel, 11, COLOR_TEXT_WHITE, true);
+        playbackDateLabel.setPadding(dp(6), 0, 0, 0);
+        btnDate.addView(playbackDateLabel);
+
+        topBar.addView(btnDate);
+        page.addView(topBar);
+
+        // 2. ESCENARIO DE VIDEO (Media3 ExoPlayer en ratio 16:9)
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int playerHeight = (screenWidth * 9) / 16;
+
+        FrameLayout videoStage = new FrameLayout(this);
+        videoStage.setBackgroundColor(Color.BLACK);
+        videoStage.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, playerHeight));
+
+        playbackPlayerView = new PlayerView(this);
+        playbackPlayerView.setUseController(false);
+        playbackPlayerView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        videoStage.addView(playbackPlayerView);
+
+        // Spinner & Status overlay
+        playbackSpinner = new ProgressBar(this);
+        playbackSpinner.setIndeterminate(true);
+        playbackSpinner.setVisibility(View.GONE);
+        FrameLayout.LayoutParams spinLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER);
+        videoStage.addView(playbackSpinner, spinLp);
+
+        playbackStatusText = new TextView(this);
+        playbackStatusText.setText("Seleccione un segmento para reproducir");
+        styleText(playbackStatusText, 12, COLOR_TEXT_GRAY, false);
+        playbackStatusText.setGravity(Gravity.CENTER);
+        playbackStatusText.setBackground(roundBg("#aa080b14", 6, null, 0));
+        playbackStatusText.setPadding(dp(10), dp(5), dp(10), dp(5));
+        FrameLayout.LayoutParams stLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        videoStage.addView(playbackStatusText, stLp);
+
+        playbackCurrentTimeOverlay = new TextView(this);
+        playbackCurrentTimeOverlay.setText("");
+        styleText(playbackCurrentTimeOverlay, 11, COLOR_TEXT_WHITE, true);
+        playbackCurrentTimeOverlay.setBackground(roundBg("#88000000", 4, null, 0));
+        playbackCurrentTimeOverlay.setPadding(dp(6), dp(2), dp(6), dp(2));
+        FrameLayout.LayoutParams timeOvLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT);
+        timeOvLp.leftMargin = dp(8);
+        timeOvLp.bottomMargin = dp(8);
+        videoStage.addView(playbackCurrentTimeOverlay, timeOvLp);
+
+        page.addView(videoStage);
+
+        // 3. BARRA DE HERRAMIENTAS Y TIEMPO (24 Horas)
+        LinearLayout timelineCard = new LinearLayout(this);
+        timelineCard.setOrientation(LinearLayout.VERTICAL);
+        timelineCard.setBackgroundColor(Color.parseColor(COLOR_BG_CARD));
+        timelineCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        // Marcas horarias: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00, 24:00
+        LinearLayout marksRow = new LinearLayout(this);
+        marksRow.setOrientation(LinearLayout.HORIZONTAL);
+        String[] hours = new String[]{"00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"};
+        for (String h : hours) {
+            TextView hTv = new TextView(this);
+            hTv.setText(h);
+            styleText(hTv, 9, COLOR_TEXT_MUTED, false);
+            hTv.setGravity(Gravity.CENTER);
+            marksRow.addView(hTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        timelineCard.addView(marksRow);
+
+        // Pista de la linea de tiempo (Barra de 24 horas)
+        playbackTimelineBar = new FrameLayout(this);
+        playbackTimelineBar.setBackground(roundBg("#151d2a", 4, COLOR_BORDER_DARK, 1));
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(14));
+        barLp.topMargin = dp(4);
+        barLp.bottomMargin = dp(4);
+        timelineCard.addView(playbackTimelineBar, barLp);
+
+        page.addView(timelineCard);
+
+        // 4. LISTA SCROLLABLE DE SEGMENTOS
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout scrollContent = new LinearLayout(this);
+        scrollContent.setOrientation(LinearLayout.VERTICAL);
+        scrollContent.setPadding(dp(14), dp(10), dp(14), dp(20));
+
+        playbackIntervalsContainer = new LinearLayout(this);
+        playbackIntervalsContainer.setOrientation(LinearLayout.VERTICAL);
+        scrollContent.addView(playbackIntervalsContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        scroll.addView(scrollContent);
+        page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // 5. BOTTOM NAV
+        page.addView(buildBottomNavBar());
+
+        rootContainer.addView(page);
+
+        loadPlaybackTimeline();
+    }
+
+    private void updatePlaybackHeader() {
+        if (playbackHeaderSub != null && activePlaybackCamera != null) {
+            playbackHeaderSub.setText(activePlaybackCamera.getShortChannelLabel() + " ▾");
+        }
+    }
+
+    private void showDatePickerModal() {
+        Calendar cal = Calendar.getInstance();
+        try {
+            if (activePlaybackDate != null) {
+                String[] parts = activePlaybackDate.split("-");
+                cal.set(Calendar.YEAR, Integer.parseInt(parts[0]));
+                cal.set(Calendar.MONTH, Integer.parseInt(parts[1]) - 1);
+                cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[2]));
+            }
+        } catch (Exception ignored) {}
+
+        DatePickerDialog dpd = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            activePlaybackDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+            if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+            loadPlaybackTimeline();
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+        dpd.show();
+    }
+
+    private void loadPlaybackTimeline() {
+        if (activePlaybackCamera == null) return;
+        final int targetCamId = activePlaybackCamera.id;
+        final String targetDate = activePlaybackDate;
+
+        if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
+        if (playbackStatusText != null) {
+            playbackStatusText.setText("Consultando grabaciones en DVR...");
+            playbackStatusText.setVisibility(View.VISIBLE);
+        }
+        if (playbackIntervalsContainer != null) {
+            playbackIntervalsContainer.removeAllViews();
+            TextView loadingTv = new TextView(this);
+            loadingTv.setText("Buscando archivos de video en el equipo...");
+            styleText(loadingTv, 12, COLOR_TEXT_GRAY, false);
+            loadingTv.setPadding(dp(8), dp(20), dp(8), dp(20));
+            loadingTv.setGravity(Gravity.CENTER);
+            playbackIntervalsContainer.addView(loadingTv);
+        }
+
+        executor.execute(() -> {
+            try {
+                String url = BASE_URL + "/api/camaras/" + targetCamId + "/recordings/timeline?date=" + targetDate;
+                HttpResponse resp = httpGet(url, authToken);
+
+                mainHandler.post(() -> {
+                    if (currentTab != 4 || activePlaybackCamera == null || activePlaybackCamera.id != targetCamId) return;
+                    if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
+
+                    if (resp.code != 200 || resp.body == null || resp.body.isEmpty()) {
+                        if (playbackStatusText != null) {
+                            playbackStatusText.setText("No se pudo obtener información del DVR");
+                        }
+                        renderPlaybackEmptyState("No se pudo conectar con el DVR o falló la autenticación.");
+                        return;
+                    }
+
+                    try {
+                        JSONObject json = new JSONObject(resp.body);
+                        boolean hasHdd = json.optBoolean("hasHdd", false);
+                        String msg = json.optString("message", "");
+                        JSONArray arr = json.optJSONArray("intervals");
+
+                        playbackIntervals.clear();
+                        if (arr != null) {
+                            for (int i = 0; i < arr.length(); i++) {
+                                JSONObject obj = arr.getJSONObject(i);
+                                RecordingInterval item = new RecordingInterval();
+                                item.start = obj.optString("start", "00:00:00");
+                                item.end = obj.optString("end", "00:00:00");
+                                item.startTime = obj.optString("startTime", "");
+                                item.endTime = obj.optString("endTime", "");
+                                item.startSeconds = obj.optInt("startSeconds", 0);
+                                item.endSeconds = obj.optInt("endSeconds", 0);
+                                item.duration = obj.optInt("duration", 0);
+                                item.type = obj.optString("type", "regular");
+                                item.streamUrl = obj.optString("stream_url", "");
+                                playbackIntervals.add(item);
+                            }
+                        }
+
+                        renderPlaybackTimelineBar();
+                        renderPlaybackIntervalsList(hasHdd, msg);
+
+                    } catch (Exception e) {
+                        renderPlaybackEmptyState("Error al procesar grabaciones: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
+                    renderPlaybackEmptyState("Error de red: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private void renderPlaybackTimelineBar() {
+        if (playbackTimelineBar == null) return;
+        playbackTimelineBar.removeAllViews();
+
+        int barWidth = playbackTimelineBar.getWidth();
+        if (barWidth <= 0) {
+            playbackTimelineBar.post(this::renderPlaybackTimelineBar);
+            return;
+        }
+
+        final double totalSeconds = 86400.0;
+        for (RecordingInterval it : playbackIntervals) {
+            int s = Math.max(0, it.startSeconds);
+            int e = Math.min(86400, it.endSeconds);
+            if (e <= s) continue;
+
+            int left = (int) ((s / totalSeconds) * barWidth);
+            int width = Math.max(dp(2), (int) (((e - s) / totalSeconds) * barWidth));
+
+            View block = new View(this);
+            String blockColor = "motion".equals(it.type) ? "#f59e0b" : "#10b981";
+            block.setBackgroundColor(Color.parseColor(blockColor));
+
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT);
+            lp.leftMargin = left;
+            playbackTimelineBar.addView(block, lp);
+        }
+    }
+
+    private void renderPlaybackEmptyState(String customMsg) {
+        if (playbackIntervalsContainer == null) return;
+        playbackIntervalsContainer.removeAllViews();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setBackground(roundBg(COLOR_BG_CARD, 12, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(20), dp(30), dp(20), dp(30));
+
+        LimenIcons.IconView icon = new LimenIcons.IconView(this, LimenIcons.ICON_CALENDAR, COLOR_TEXT_MUTED);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+        TextView title = new TextView(this);
+        title.setText("Sin grabaciones registradas");
+        styleText(title, 14, COLOR_TEXT_WHITE, true);
+        title.setPadding(0, dp(10), 0, dp(4));
+        card.addView(title);
+
+        TextView sub = new TextView(this);
+        sub.setText(customMsg != null ? customMsg : "No se encontraron archivos grabados para esta fecha. Compruebe si el DVR posee almacenamiento interno (HDD).");
+        styleText(sub, 12, COLOR_TEXT_GRAY, false);
+        sub.setGravity(Gravity.CENTER);
+        card.addView(sub);
+
+        playbackIntervalsContainer.addView(card, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+    }
+
+    private void renderPlaybackIntervalsList(boolean hasHdd, String serverMsg) {
+        if (playbackIntervalsContainer == null) return;
+        playbackIntervalsContainer.removeAllViews();
+
+        if (playbackIntervals.isEmpty()) {
+            renderPlaybackEmptyState(serverMsg.isEmpty() ? null : serverMsg);
+            return;
+        }
+
+        TextView countHeader = new TextView(this);
+        countHeader.setText("Clips grabados (" + playbackIntervals.size() + ")");
+        styleText(countHeader, 13, COLOR_TEXT_WHITE, true);
+        countHeader.setPadding(dp(4), dp(6), dp(4), dp(10));
+        playbackIntervalsContainer.addView(countHeader);
+
+        for (int i = 0; i < playbackIntervals.size(); i++) {
+            final RecordingInterval it = playbackIntervals.get(i);
+
+            LinearLayout itemRow = new LinearLayout(this);
+            itemRow.setOrientation(LinearLayout.HORIZONTAL);
+            itemRow.setGravity(Gravity.CENTER_VERTICAL);
+            itemRow.setBackground(roundBg(COLOR_BG_CARD, 10, COLOR_BORDER_DARK, 1));
+            itemRow.setPadding(dp(12), dp(10), dp(12), dp(10));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            lp.bottomMargin = dp(8);
+
+            boolean isMotion = "motion".equals(it.type);
+            String badgeColor = isMotion ? "#f59e0b" : "#10b981";
+            FrameLayout iconCircle = new FrameLayout(this);
+            iconCircle.setBackground(circleBg(COLOR_BG_ELEVATED, badgeColor, 1));
+            iconCircle.addView(new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, badgeColor),
+                    new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.CENTER));
+            itemRow.addView(iconCircle, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setPadding(dp(10), 0, dp(10), 0);
+
+            TextView timeTv = new TextView(this);
+            timeTv.setText(it.start + " - " + it.end);
+            styleText(timeTv, 13, COLOR_TEXT_WHITE, true);
+            textCol.addView(timeTv);
+
+            TextView typeTv = new TextView(this);
+            int mins = it.duration / 60;
+            int secs = it.duration % 60;
+            String durStr = mins > 0 ? (mins + "m " + secs + "s") : (secs + "s");
+            typeTv.setText((isMotion ? "Detección de Movimiento" : "Grabación Continua") + " · " + durStr);
+            styleText(typeTv, 10, COLOR_TEXT_GRAY, false);
+            textCol.addView(typeTv);
+
+            itemRow.addView(textCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button btnPlay = new Button(this);
+            btnPlay.setText("▶ Ver");
+            btnPlay.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            btnPlay.setTextColor(Color.WHITE);
+            btnPlay.setBackground(roundBg("#4f46e5", 6, null, 0));
+            btnPlay.setPadding(dp(12), dp(4), dp(12), dp(4));
+            btnPlay.setOnClickListener(v -> playRecordingInterval(it));
+            itemRow.addView(btnPlay, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+
+            playbackIntervalsContainer.addView(itemRow, lp);
+        }
+    }
+
+    private void playRecordingInterval(RecordingInterval it) {
+        if (it == null || it.streamUrl == null || it.streamUrl.isEmpty()) return;
+        currentlyPlayingInterval = it;
+
+        if (playbackStatusText != null) {
+            playbackStatusText.setText("Conectando stream de grabación...");
+            playbackStatusText.setVisibility(View.VISIBLE);
+        }
+        if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
+        if (playbackCurrentTimeOverlay != null) {
+            playbackCurrentTimeOverlay.setText(it.start + " - " + it.end);
+        }
+
+        try {
+            if (playbackPlayer == null) {
+                DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(2000, 10000, 500, 1500)
+                        .setPrioritizeTimeOverSizeThresholds(true)
+                        .build();
+
+                playbackPlayer = new ExoPlayer.Builder(this)
+                        .setLoadControl(loadControl)
+                        .build();
+
+                playbackPlayer.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+
+                playbackPlayer.addListener(new Player.Listener() {
+                    @Override
+                    public void onPlaybackStateChanged(int state) {
+                        if (state == Player.STATE_READY) {
+                            if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
+                            if (playbackStatusText != null) playbackStatusText.setVisibility(View.GONE);
+                        } else if (state == Player.STATE_BUFFERING) {
+                            if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
+                        } else if (state == Player.STATE_ENDED) {
+                            if (playbackStatusText != null) {
+                                playbackStatusText.setText("Fin de reproducción del clip");
+                                playbackStatusText.setVisibility(View.VISIBLE);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onPlayerError(@NonNull PlaybackException error) {
+                        if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
+                        if (playbackStatusText != null) {
+                            playbackStatusText.setText("Error al reproducir: " + error.getMessage());
+                            playbackStatusText.setVisibility(View.VISIBLE);
+                        }
+                    }
+                });
+
+                if (playbackPlayerView != null) {
+                    playbackPlayerView.setPlayer(playbackPlayer);
+                }
+            }
+
+            String fullUrl = BASE_URL + it.streamUrl;
+            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(fullUrl));
+            playbackPlayer.setMediaItem(mediaItem);
+            playbackPlayer.prepare();
+            playbackPlayer.setPlayWhenReady(true);
+        } catch (Throwable t) {
+            reportCrashToServer("playRecordingInterval error", t);
+        }
+    }
+
 }
