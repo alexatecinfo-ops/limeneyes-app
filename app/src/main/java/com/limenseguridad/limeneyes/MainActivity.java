@@ -538,6 +538,25 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        LinearLayout regRow = new LinearLayout(this);
+        regRow.setOrientation(LinearLayout.HORIZONTAL);
+        regRow.setGravity(Gravity.CENTER);
+        regRow.setPadding(0, dp(18), 0, 0);
+
+        TextView noAccText = new TextView(this);
+        noAccText.setText("\u00bfNo tienes una cuenta? ");
+        styleText(noAccText, 13, COLOR_TEXT_GRAY, false);
+        regRow.addView(noAccText);
+
+        TextView regBtn = new TextView(this);
+        regBtn.setText("Registrarse");
+        styleText(regBtn, 13, COLOR_ACCENT_CYAN, true);
+        regBtn.setPadding(dp(4), dp(4), dp(4), dp(4));
+        regBtn.setOnClickListener(v -> promptRegisterModal());
+        regRow.addView(regBtn);
+
+        container.addView(regRow);
+
         TextView legalFooter = new TextView(this);
         legalFooter.setText("LIMEN EYES v" + BuildConfig.VERSION_NAME + " \u00b7 Desarrollada por LIMEN SEGURIDAD\n\u00a9 2026 Limen Seguridad \u00b7 Monitoreo y Auditor\u00eda Perimetral");
         styleText(legalFooter, 11, COLOR_TEXT_MUTED, false);
@@ -551,6 +570,129 @@ public class MainActivity extends AppCompatActivity {
 
         scroll.addView(container);
         rootContainer.addView(scroll);
+    }
+
+    private void promptRegisterModal() {
+        final Dialog dialog = createCustomLimenDialog();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(22), dp(20), dp(22), dp(18));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, 0, 0, dp(12));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.limen_logo);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(26), dp(26));
+        iLp.rightMargin = dp(10);
+        head.addView(icon, iLp);
+
+        TextView title = new TextView(this);
+        title.setText("Registrarse en Limen Eyes");
+        styleText(title, 16, COLOR_TEXT_WHITE, true);
+        head.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        FrameLayout closeBtn = new FrameLayout(this);
+        closeBtn.setPadding(dp(4), dp(4), dp(4), dp(4));
+        closeBtn.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CLOSE, COLOR_TEXT_GRAY),
+                new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        head.addView(closeBtn);
+        card.addView(head);
+
+        TextView desc = new TextView(this);
+        desc.setText("Crea tu cuenta o solicita la vinculaci\u00f3n de tus c\u00e1maras utilizando tu cuenta de Google. Al registrarte, un administrador en BunkerDome autorizar\u00e1 tu acceso.");
+        styleText(desc, 13, COLOR_TEXT_GRAY, false);
+        desc.setLineSpacing(dp(2), 1.15f);
+        desc.setPadding(0, 0, 0, dp(18));
+        card.addView(desc);
+
+        LinearLayout googleRegBtn = new LinearLayout(this);
+        googleRegBtn.setOrientation(LinearLayout.HORIZONTAL);
+        googleRegBtn.setGravity(Gravity.CENTER);
+        googleRegBtn.setPadding(dp(16), dp(13), dp(16), dp(13));
+        googleRegBtn.setBackground(roundBg(COLOR_BTN_BLUE, 12, null, 0));
+
+        TextView gIcon = new TextView(this);
+        gIcon.setText("G");
+        styleText(gIcon, 17, COLOR_TEXT_WHITE, true);
+        gIcon.setPadding(0, 0, dp(10), 0);
+        googleRegBtn.addView(gIcon);
+
+        TextView gLabel = new TextView(this);
+        gLabel.setText("Registrarse con Google");
+        styleText(gLabel, 14, COLOR_TEXT_WHITE, true);
+        googleRegBtn.addView(gLabel);
+
+        googleRegBtn.setOnClickListener(v -> {
+            dialog.dismiss();
+            startNativeGoogleSignIn("");
+        });
+        LinearLayout.LayoutParams grLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        grLp.bottomMargin = dp(12);
+        card.addView(googleRegBtn, grLp);
+
+        TextView infoNote = new TextView(this);
+        infoNote.setText("\u26a1 Se crear\u00e1 una solicitud autom\u00e1tica en BunkerDome para vincular tus grabadores DVR/NVR.");
+        styleText(infoNote, 11, COLOR_TEXT_MUTED, false);
+        infoNote.setGravity(Gravity.CENTER);
+        card.addView(infoNote);
+
+        dialog.setContentView(card);
+        dialog.show();
+    }
+
+    private void showBunkerDomeRequestModal(String email, String message) {
+        mainHandler.post(() -> {
+            final Dialog dialog = createCustomLimenDialog();
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+            card.setPadding(dp(22), dp(20), dp(22), dp(18));
+
+            LinearLayout head = new LinearLayout(this);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            head.setGravity(Gravity.CENTER_VERTICAL);
+            head.setPadding(0, 0, 0, dp(12));
+
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(R.drawable.limen_logo);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(26), dp(26));
+            iLp.rightMargin = dp(10);
+            head.addView(icon, iLp);
+
+            TextView title = new TextView(this);
+            title.setText("Solicitud enviada a BunkerDome");
+            styleText(title, 16, COLOR_ONLINE, true);
+            head.addView(title);
+            card.addView(head);
+
+            TextView body = new TextView(this);
+            body.setText(message != null && !message.isEmpty() ? message :
+                    "Tu cuenta de Google (" + email + ") ha sido registrada con \u00e9xito.\n\nUn operador de Limen Seguridad recibi\u00f3 tu solicitud en BunkerDome para vincular tus dispositivos.");
+            styleText(body, 13, COLOR_TEXT_WHITE, false);
+            body.setLineSpacing(dp(2), 1.2f);
+            body.setPadding(0, 0, 0, dp(20));
+            card.addView(body);
+
+            Button btnOk = new Button(this);
+            btnOk.setText("Entendido");
+            styleText(btnOk, 13, COLOR_TEXT_WHITE, true);
+            btnOk.setAllCaps(false);
+            btnOk.setBackground(roundBg(COLOR_BTN_BLUE, 10, null, 0));
+            btnOk.setOnClickListener(v -> dialog.dismiss());
+            card.addView(btnOk, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+
+            dialog.setContentView(card);
+            dialog.show();
+        });
     }
 
     private void showLoginError(String msg) {
@@ -663,6 +805,8 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject json = new JSONObject(resp.body);
                 if (resp.code == 200 && json.has("token")) {
                     saveSessionAndEnter(json);
+                } else if (resp.code == 403 && (json.optString("error").contains("BunkerDome") || json.optString("message").contains("BunkerDome"))) {
+                    showBunkerDomeRequestModal(email, json.optString("message"));
                 } else {
                     String err = json.optString("message", json.optString("error", "Cuenta no autorizada"));
                     showLoginError(err);
