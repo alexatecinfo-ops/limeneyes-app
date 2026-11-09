@@ -26,14 +26,14 @@ jobs:
     - name: Grant Execute Permission for Gradlew
       run: chmod +x gradlew
 
-    - name: Build APK (Debug)
-      run: ./gradlew assembleDebug --stacktrace
+    - name: Build APKs (Release & Debug)
+      run: ./gradlew assembleRelease assembleDebug --stacktrace
 
-    - name: Upload Debug APK
+    - name: Upload Release Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: LimenEyes-Debug-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
+        name: LimenEyes-Release-APK
+        path: app/build/outputs/apk/release/app-release.apk
 
     - name: Delete old release tag if exists
       run: |
@@ -46,14 +46,13 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v2.5.0-beta
-        name: "LIMEN EYES v2.5.0-beta - Paleta Oficial Limen, Logotipos e Información Legal"
+        name: "LIMEN EYES v2.5.0-beta - Playback Grabaciones & Performance"
         body: |
           ### 📱 LIMEN EYES v2.5.0-beta - Plataforma Oficial de Monitoreo
-          - **Paleta Oficial Limen Seguridad**: Dark bunker obsidian (#080B14), índigo (#818CF8 / #4F46E5) y verde esmeralda para estados online.
-          - **Logotipo Oficial Vectorial**: Escudo de seguridad y lente biométrica central incorporado en TopBar, Login y sección de Cuenta.
-          - **Información Legal y Cumplimiento**: Atribución 'Desarrollada por LIMEN SEGURIDAD', Copyright © 2026, marco normativo Ley N° 25.326 y canales de soporte directo.
-          - **Soporte H.265 / HEVC y H.264 nativo**: Reproducción fluida y arquitectura P2P de baja latencia conectada a eyes.limenseguridad.com.
+          - **Módulo de Grabaciones (Playback HDD)**: Lógica on-demand con regla de tiempo 24h interactiva y selector rápido.
+          - **Compilación Release Firmada**: Certificación oficial de seguridad V1/V2 para instalación instantánea sin bloqueos de Play Protect.
         files: |
+          app/build/outputs/apk/release/app-release.apk
           app/build/outputs/apk/debug/app-debug.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
