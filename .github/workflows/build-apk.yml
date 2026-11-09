@@ -37,18 +37,18 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.4.4 --yes || true
-        git push origin :refs/tags/v2.4.4 || true
+        gh release delete v2.4.5 --yes || true
+        git push origin :refs/tags/v2.4.5 || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.4.4
+    - name: Create GitHub Release v2.4.5
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.4.4
-        name: "LIMEN EYES v2.4.4 - Paleta Oficial Limen, Logotipos e Información Legal"
+        tag_name: v2.4.5
+        name: "LIMEN EYES v2.4.5 - Paleta Oficial Limen, Logotipos e Información Legal"
         body: |
-          ### 📱 LIMEN EYES v2.4.4 - Plataforma Oficial de Monitoreo
+          ### 📱 LIMEN EYES v2.4.5 - Plataforma Oficial de Monitoreo
           - **Paleta Oficial Limen Seguridad**: Dark bunker obsidian (#080B14), índigo (#818CF8 / #4F46E5) y verde esmeralda para estados online.
           - **Logotipo Oficial Vectorial**: Escudo de seguridad y lente biométrica central incorporado en TopBar, Login y sección de Cuenta.
           - **Información Legal y Cumplimiento**: Atribución 'Desarrollada por LIMEN SEGURIDAD', Copyright © 2026, marco normativo Ley N° 25.326 y canales de soporte directo.

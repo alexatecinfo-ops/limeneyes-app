@@ -364,8 +364,10 @@ public class MainActivity extends AppCompatActivity {
         shieldBadge.setBackground(roundBg(COLOR_BG_CARD, 20, COLOR_BORDER_DARK, 1));
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(64), dp(64));
         badgeLp.bottomMargin = dp(16);
-        LimenIcons.IconView shieldIcon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        shieldBadge.addView(shieldIcon, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+        ImageView shieldIcon = new ImageView(this);
+        shieldIcon.setImageResource(R.drawable.limen_logo);
+        shieldIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        shieldBadge.addView(shieldIcon, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER));
         container.addView(shieldBadge, badgeLp);
 
         TextView brandTag = new TextView(this);
@@ -537,7 +539,7 @@ public class MainActivity extends AppCompatActivity {
         ));
 
         TextView legalFooter = new TextView(this);
-        legalFooter.setText("LIMEN EYES v2.4.2 · Desarrollada por LIMEN SEGURIDAD\n© 2026 Limen Seguridad · Monitoreo y Auditoría Perimetral");
+        legalFooter.setText("LIMEN EYES v" + BuildConfig.VERSION_NAME + " \u00b7 Desarrollada por LIMEN SEGURIDAD\n\u00a9 2026 Limen Seguridad \u00b7 Monitoreo y Auditor\u00eda Perimetral");
         styleText(legalFooter, 11, COLOR_TEXT_MUTED, false);
         legalFooter.setGravity(Gravity.CENTER);
         legalFooter.setLineSpacing(dp(2), 1f);
@@ -797,8 +799,10 @@ public class MainActivity extends AppCompatActivity {
         titleLockup.setOrientation(LinearLayout.HORIZONTAL);
         titleLockup.setGravity(Gravity.CENTER);
 
-        LimenIcons.IconView brandLogo = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        LinearLayout.LayoutParams blLp = new LinearLayout.LayoutParams(dp(18), dp(18));
+        ImageView brandLogo = new ImageView(this);
+        brandLogo.setImageResource(R.drawable.limen_logo);
+        brandLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams blLp = new LinearLayout.LayoutParams(dp(24), dp(24));
         blLp.rightMargin = dp(8);
         titleLockup.addView(brandLogo, blLp);
 
@@ -2479,10 +2483,12 @@ public class MainActivity extends AppCompatActivity {
         // Avatar Badge con Logotipo Limen
         FrameLayout avatar = new FrameLayout(this);
         avatar.setBackground(roundBg(COLOR_BG_CARD, 24, COLOR_BORDER_DARK, 1));
-        LimenIcons.IconView userIcon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        avatar.addView(userIcon, new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER));
+        ImageView userIcon = new ImageView(this);
+        userIcon.setImageResource(R.drawable.limen_logo);
+        userIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        avatar.addView(userIcon, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
 
-        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(76), dp(76));
+        LinearLayout.LayoutParams avLp = new LinearLayout.LayoutParams(dp(80), dp(80));
         avLp.bottomMargin = dp(12);
         content.addView(avatar, avLp);
 
@@ -2534,8 +2540,10 @@ public class MainActivity extends AppCompatActivity {
         legalHeader.setGravity(Gravity.CENTER_VERTICAL);
         legalHeader.setPadding(0, 0, 0, dp(10));
 
-        LimenIcons.IconView brandLogo = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ImageView brandLogo = new ImageView(this);
+        brandLogo.setImageResource(R.drawable.limen_logo);
+        brandLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(22), dp(22));
         blp.rightMargin = dp(8);
         legalHeader.addView(brandLogo, blp);
 
@@ -2546,7 +2554,7 @@ public class MainActivity extends AppCompatActivity {
         legalCard.addView(legalHeader);
 
         TextView appVer = new TextView(this);
-        appVer.setText("LIMEN EYES v2.4.2 · Plataforma Profesional de Monitoreo");
+        appVer.setText("LIMEN EYES v" + BuildConfig.VERSION_NAME + " \u00b7 Plataforma Profesional de Monitoreo");
         styleText(appVer, 12, COLOR_ACCENT_CYAN, true);
         appVer.setPadding(0, 0, 0, dp(8));
         legalCard.addView(appVer);
@@ -3084,7 +3092,9 @@ public class MainActivity extends AppCompatActivity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, dp(12));
 
-        LimenIcons.IconView icon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.limen_logo);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(24), dp(24));
         iLp.rightMargin = dp(10);
         head.addView(icon, iLp);
@@ -3253,8 +3263,10 @@ public class MainActivity extends AppCompatActivity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, dp(12));
 
-        LimenIcons.IconView ic = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(22), dp(22));
+        ImageView ic = new ImageView(this);
+        ic.setImageResource(R.drawable.limen_logo);
+        ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(24), dp(24));
         icLp.rightMargin = dp(8);
         head.addView(ic, icLp);
 
@@ -3449,8 +3461,10 @@ public class MainActivity extends AppCompatActivity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, dp(12));
 
-        LimenIcons.IconView icon = new LimenIcons.IconView(this, LimenIcons.ICON_LOGO_LIMEN, COLOR_ACCENT_CYAN);
-        LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(24), dp(24));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.limen_logo);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(dp(26), dp(26));
         iLp.rightMargin = dp(10);
         head.addView(icon, iLp);
 
