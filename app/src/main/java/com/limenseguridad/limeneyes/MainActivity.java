@@ -99,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
+    private static final String APP_VERSION_NAME = "2.4.5";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -558,7 +559,7 @@ public class MainActivity extends AppCompatActivity {
         container.addView(regRow);
 
         TextView legalFooter = new TextView(this);
-        legalFooter.setText("LIMEN EYES v" + BuildConfig.VERSION_NAME + " \u00b7 Desarrollada por LIMEN SEGURIDAD\n\u00a9 2026 Limen Seguridad \u00b7 Monitoreo y Auditor\u00eda Perimetral");
+        legalFooter.setText("LIMEN EYES v" + APP_VERSION_NAME + " \u00b7 Desarrollada por LIMEN SEGURIDAD\n\u00a9 2026 Limen Seguridad \u00b7 Monitoreo y Auditor\u00eda Perimetral");
         styleText(legalFooter, 11, COLOR_TEXT_MUTED, false);
         legalFooter.setGravity(Gravity.CENTER);
         legalFooter.setLineSpacing(dp(2), 1f);
@@ -2698,7 +2699,7 @@ public class MainActivity extends AppCompatActivity {
         legalCard.addView(legalHeader);
 
         TextView appVer = new TextView(this);
-        appVer.setText("LIMEN EYES v" + BuildConfig.VERSION_NAME + " \u00b7 Plataforma Profesional de Monitoreo");
+        appVer.setText("LIMEN EYES v" + APP_VERSION_NAME + " \u00b7 Plataforma Profesional de Monitoreo");
         styleText(appVer, 12, COLOR_ACCENT_CYAN, true);
         appVer.setPadding(0, 0, 0, dp(8));
         legalCard.addView(appVer);
