@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.2-beta";
+    private static final String APP_VERSION_NAME = "2.5.3-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -4461,11 +4461,15 @@ public class MainActivity extends AppCompatActivity {
         final CameraItem[] selectedChoice = new CameraItem[]{activePlaybackCamera};
 
         final Button btnStartPlayback = new Button(this);
-        btnStartPlayback.setText(selectedChoice[0] != null ? "Comenzar Playback: " + selectedChoice[0].getShortChannelLabel() : "Comenzar Playback");
+        btnStartPlayback.setText("Comenzar Playback");
         btnStartPlayback.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        btnStartPlayback.setTypeface(Typeface.DEFAULT_BOLD);
         btnStartPlayback.setTextColor(Color.WHITE);
-        btnStartPlayback.setBackground(roundBg(selectedChoice[0] != null ? "#4f46e5" : "#20283e", 10, null, 0));
-        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        btnStartPlayback.setSingleLine(true);
+        btnStartPlayback.setEllipsize(TextUtils.TruncateAt.END);
+        btnStartPlayback.setGravity(Gravity.CENTER);
+        btnStartPlayback.setBackground(roundBg(selectedChoice[0] != null ? "#2563eb" : "#20283e", 10, null, 0));
+        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
         startLp.topMargin = dp(12);
         card.addView(btnStartPlayback, startLp);
 
@@ -4559,8 +4563,8 @@ public class MainActivity extends AppCompatActivity {
 
                     chRow.setOnClickListener(v -> {
                         selectedChoice[0] = targetCam;
-                        btnStartPlayback.setBackground(roundBg("#4f46e5", 10, null, 0));
-                        btnStartPlayback.setText("Comenzar Playback: " + targetCam.getShortChannelLabel());
+                        btnStartPlayback.setBackground(roundBg("#2563eb", 10, null, 0));
+                        btnStartPlayback.setText("Comenzar Playback");
                         renderListHolder[0].run();
                     });
 
@@ -4586,8 +4590,19 @@ public class MainActivity extends AppCompatActivity {
             dialog.dismiss();
             activePlaybackCamera = selectedChoice[0];
             isPlaybackLoaded = true;
-            if (playbackHeaderTitle != null) playbackHeaderTitle.setText(activePlaybackCamera.getShortChannelLabel());
-            if (playbackHeaderSub != null) playbackHeaderSub.setText(activePlaybackCamera.getGroupTitle());
+
+            // En DMSS y monitoreo profesional, al iniciar la reproducción pasa automáticamente a 1 cámara (pantalla completa)
+            isPlaybackSingleCell = true;
+            applyPlaybackGridLayout(selectedPlaybackCell);
+
+            if (playbackHeaderTitle != null) {
+                playbackHeaderTitle.setText(activePlaybackCamera.getGroupTitle() != null && !activePlaybackCamera.getGroupTitle().isEmpty()
+                        ? activePlaybackCamera.getGroupTitle()
+                        : activePlaybackCamera.getShortChannelLabel());
+            }
+            if (playbackHeaderSub != null) {
+                playbackHeaderSub.setText(activePlaybackCamera.getShortChannelLabel());
+            }
             if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
 
             setupPlaybackCellWithPlayer();
@@ -4920,6 +4935,8 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onPlayerError(@NonNull PlaybackException error) {
+                        Log.e(TAG, "Playback ExoPlayer error: " + error.getMessage(), error);
+                        reportCrashToServer("Playback ExoPlayer error: " + error.getErrorCodeName() + " - " + error.getMessage(), error);
                         if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
                         if (playbackPlayPauseIcon != null) playbackPlayPauseIcon.setIconType(LimenIcons.ICON_PLAY);
                         isPlaybackPlaying = false;
@@ -4934,10 +4951,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             String fullUrl = BASE_URL + it.streamUrl;
-            MediaItem mediaItem = new MediaItem.Builder()
-                    .setUri(Uri.parse(fullUrl))
-                    .setMimeType(MimeTypes.APPLICATION_MP4)
-                    .build();
+            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(fullUrl));
             playbackPlayer.setMediaItem(mediaItem);
             playbackPlayer.prepare();
             playbackPlayer.setPlayWhenReady(true);
