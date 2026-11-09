@@ -607,7 +607,7 @@ public class MainActivity extends AppCompatActivity {
         card.addView(head);
 
         TextView desc = new TextView(this);
-        desc.setText("Crea tu cuenta o solicita la vinculaci\u00f3n de tus c\u00e1maras utilizando tu cuenta de Google. Al registrarte, un administrador en BunkerDome autorizar\u00e1 tu acceso.");
+        desc.setText("Crea tu cuenta o solicita la vinculaci\u00f3n de tus c\u00e1maras utilizando tu cuenta de Google. Al registrarte, la administraci\u00f3n de Limen Seguridad autorizar\u00e1 tu acceso.");
         styleText(desc, 13, COLOR_TEXT_GRAY, false);
         desc.setLineSpacing(dp(2), 1.15f);
         desc.setPadding(0, 0, 0, dp(18));
@@ -639,7 +639,7 @@ public class MainActivity extends AppCompatActivity {
         card.addView(googleRegBtn, grLp);
 
         TextView infoNote = new TextView(this);
-        infoNote.setText("\u26a1 Se crear\u00e1 una solicitud autom\u00e1tica en BunkerDome para vincular tus grabadores DVR/NVR.");
+        infoNote.setText("\u26a1 Se enviar\u00e1 una solicitud al Centro de Control para vincular tus grabadores DVR/NVR.");
         styleText(infoNote, 11, COLOR_TEXT_MUTED, false);
         infoNote.setGravity(Gravity.CENTER);
         card.addView(infoNote);
@@ -648,7 +648,7 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private void showBunkerDomeRequestModal(String email, String message) {
+    private void showAccessRequestPendingModal(String email, String message) {
         mainHandler.post(() -> {
             final Dialog dialog = createCustomLimenDialog();
 
@@ -670,14 +670,14 @@ public class MainActivity extends AppCompatActivity {
             head.addView(icon, iLp);
 
             TextView title = new TextView(this);
-            title.setText("Solicitud enviada a BunkerDome");
+            title.setText("Solicitud de acceso enviada");
             styleText(title, 16, COLOR_ONLINE, true);
             head.addView(title);
             card.addView(head);
 
             TextView body = new TextView(this);
             body.setText(message != null && !message.isEmpty() ? message :
-                    "Tu cuenta de Google (" + email + ") ha sido registrada con \u00e9xito.\n\nUn operador de Limen Seguridad recibi\u00f3 tu solicitud en BunkerDome para vincular tus dispositivos.");
+                    "Tu cuenta de Google (" + email + ") ha sido registrada con \u00e9xito.\n\nEl Centro de Control de Limen Seguridad recibi\u00f3 tu solicitud para vincular tus dispositivos a la brevedad.");
             styleText(body, 13, COLOR_TEXT_WHITE, false);
             body.setLineSpacing(dp(2), 1.2f);
             body.setPadding(0, 0, 0, dp(20));
@@ -806,8 +806,8 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject json = new JSONObject(resp.body);
                 if (resp.code == 200 && json.has("token")) {
                     saveSessionAndEnter(json);
-                } else if (resp.code == 403 && (json.optString("error").contains("BunkerDome") || json.optString("message").contains("BunkerDome"))) {
-                    showBunkerDomeRequestModal(email, json.optString("message"));
+                } else if (resp.code == 403 && (json.optString("error").contains("autorizaci") || json.optString("message").contains("registrada") || json.optString("message").contains("solicitud"))) {
+                    showAccessRequestPendingModal(email, json.optString("message"));
                 } else {
                     String err = json.optString("message", json.optString("error", "Cuenta no autorizada"));
                     showLoginError(err);
