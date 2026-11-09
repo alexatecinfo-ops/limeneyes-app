@@ -1,6 +1,7 @@
 package com.limenseguridad.limeneyes;
 
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import java.util.Calendar;
 import android.content.Context;
@@ -4079,13 +4080,16 @@ public class MainActivity extends AppCompatActivity {
         playbackDateLabel.setText(activePlaybackDate);
         styleText(playbackDateLabel, 13, COLOR_TEXT_WHITE, true);
         playbackDateLabel.setPadding(dp(12), 0, dp(10), 0);
-        playbackDateLabel.setOnClickListener(v -> showDatePickerModal());
+        playbackDateLabel.setOnClickListener(v -> showPlaybackSelectorModal());
         datePill.addView(playbackDateLabel);
 
         TextView filterTag = new TextView(this);
-        filterTag.setText("Todos");
+        filterTag.setText(activePlaybackCamera != null ? activePlaybackCamera.getShortChannelLabel() : "Todos");
         styleText(filterTag, 12, COLOR_ACCENT_CYAN, false);
+        filterTag.setOnClickListener(v -> showPlaybackSelectorModal());
         datePill.addView(filterTag);
+
+        datePill.setOnClickListener(v -> showPlaybackSelectorModal());
 
         FrameLayout btnNextDay = new FrameLayout(this);
         btnNextDay.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CHEVRON_R, COLOR_TEXT_WHITE),
@@ -4226,7 +4230,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
 
-        DatePickerDialog dpd = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+        DatePickerDialog dpd = new DatePickerDialog(this, AlertDialog.THEME_HOLO_DARK, (view, year, month, dayOfMonth) -> {
             activePlaybackDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
             if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
             if (isPlaybackLoaded && activePlaybackCamera != null) {
@@ -4281,138 +4285,243 @@ public class MainActivity extends AppCompatActivity {
     // MODAL DE SELECCIÓN DE EQUIPO Y CANAL (Imagen 3)
     // =========================================================================
     private void showPlaybackSelectorModal() {
-        Dialog dialog = new Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        final Dialog dialog = createCustomLimenDialog();
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
 
-        // Titulo
-        TextView title = new TextView(this);
-        title.setText("Seleccionar Canal y Fecha");
-        styleText(title, 16, COLOR_TEXT_WHITE, true);
-        title.setPadding(0, 0, 0, dp(12));
-        card.addView(title);
+        // 1. Cabecera con Titulo y Botón Cerrar (X)
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(12));
 
-        // Barra de busqueda
+        LimenIcons.IconView calIc = new LimenIcons.IconView(this, LimenIcons.ICON_FILMSTRIP, COLOR_ACCENT_CYAN);
+        header.addView(calIc, new LinearLayout.LayoutParams(dp(20), dp(20)));
+
+        TextView title = new TextView(this);
+        title.setText("Elegir Canal y Fecha");
+        styleText(title, 15, COLOR_TEXT_WHITE, true);
+        title.setPadding(dp(8), 0, 0, 0);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        FrameLayout closeBtn = new FrameLayout(this);
+        closeBtn.setPadding(dp(6), dp(6), dp(6), dp(6));
+        closeBtn.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CLOSE, COLOR_TEXT_GRAY),
+                new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        header.addView(closeBtn);
+        card.addView(header);
+
+        // 2. Fila de Fecha interactiva con botones +/- día y botón calendario
+        LinearLayout dateRow = new LinearLayout(this);
+        dateRow.setOrientation(LinearLayout.HORIZONTAL);
+        dateRow.setGravity(Gravity.CENTER_VERTICAL);
+        dateRow.setBackground(roundBg("#101726", 10, COLOR_BORDER_DARK, 1));
+        dateRow.setPadding(dp(10), dp(8), dp(10), dp(8));
+        LinearLayout.LayoutParams drLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        drLp.bottomMargin = dp(10);
+        card.addView(dateRow, drLp);
+
+        TextView dateLbl = new TextView(this);
+        dateLbl.setText("Fecha:");
+        styleText(dateLbl, 12, COLOR_TEXT_GRAY, false);
+        dateRow.addView(dateLbl);
+
+        // Boton dia anterior
+        FrameLayout btnPrevModal = new FrameLayout(this);
+        btnPrevModal.setPadding(dp(8), dp(4), dp(8), dp(4));
+        btnPrevModal.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CHEVRON_L, COLOR_TEXT_WHITE),
+                new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.CENTER));
+        dateRow.addView(btnPrevModal);
+
+        final TextView modalDateTv = new TextView(this);
+        modalDateTv.setText(activePlaybackDate);
+        styleText(modalDateTv, 14, COLOR_ACCENT_CYAN, true);
+        modalDateTv.setGravity(Gravity.CENTER);
+        dateRow.addView(modalDateTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        // Boton dia siguiente
+        FrameLayout btnNextModal = new FrameLayout(this);
+        btnNextModal.setPadding(dp(8), dp(4), dp(8), dp(4));
+        btnNextModal.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CHEVRON_R, COLOR_TEXT_WHITE),
+                new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.CENTER));
+        dateRow.addView(btnNextModal);
+
+        // Boton icono calendario
+        FrameLayout btnCalModal = new FrameLayout(this);
+        btnCalModal.setPadding(dp(6), dp(4), dp(6), dp(4));
+        btnCalModal.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CALENDAR, COLOR_ACCENT_CYAN),
+                new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        dateRow.addView(btnCalModal);
+
+        btnPrevModal.setOnClickListener(v -> {
+            stepPlaybackDate(-1);
+            modalDateTv.setText(activePlaybackDate);
+        });
+
+        btnNextModal.setOnClickListener(v -> {
+            stepPlaybackDate(1);
+            modalDateTv.setText(activePlaybackDate);
+        });
+
+        btnCalModal.setOnClickListener(v -> {
+            Calendar cal = Calendar.getInstance();
+            try {
+                if (activePlaybackDate != null) {
+                    String[] parts = activePlaybackDate.split("-");
+                    cal.set(Calendar.YEAR, Integer.parseInt(parts[0]));
+                    cal.set(Calendar.MONTH, Integer.parseInt(parts[1]) - 1);
+                    cal.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[2]));
+                }
+            } catch (Exception ignored) {}
+
+            DatePickerDialog dpd = new DatePickerDialog(this, AlertDialog.THEME_HOLO_DARK, (vw, year, month, dayOfMonth) -> {
+                activePlaybackDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                modalDateTv.setText(activePlaybackDate);
+                if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+            dpd.show();
+        });
+
+        modalDateTv.setOnClickListener(v -> btnCalModal.performClick());
+
+        // 3. Barra de busqueda
         LinearLayout searchBox = new LinearLayout(this);
         searchBox.setOrientation(LinearLayout.HORIZONTAL);
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
-        searchBox.setBackground(roundBg("#151d2a", 10, COLOR_BORDER_DARK, 1));
-        searchBox.setPadding(dp(12), dp(2), dp(12), dp(2));
+        searchBox.setBackground(roundBg("#0d131f", 8, COLOR_BORDER_DARK, 1));
+        searchBox.setPadding(dp(10), dp(2), dp(10), dp(2));
         searchBox.addView(new LimenIcons.IconView(this, LimenIcons.ICON_SEARCH, COLOR_TEXT_GRAY),
-                new LinearLayout.LayoutParams(dp(16), dp(16)));
+                new LinearLayout.LayoutParams(dp(14), dp(14)));
 
         EditText searchEt = new EditText(this);
         searchEt.setHint("Buscar equipo o cámara...");
         searchEt.setHintTextColor(Color.parseColor(COLOR_TEXT_MUTED));
-        styleText(searchEt, 13, COLOR_TEXT_WHITE, false);
+        styleText(searchEt, 12, COLOR_TEXT_WHITE, false);
         searchEt.setBackgroundColor(Color.TRANSPARENT);
         searchEt.setSingleLine(true);
-        searchEt.setPadding(dp(10), dp(6), dp(6), dp(6));
-        searchBox.addView(searchEt, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        searchEt.setPadding(dp(8), dp(4), dp(4), dp(4));
+        searchBox.addView(searchEt, new LinearLayout.LayoutParams(0, dp(36), 1f));
         card.addView(searchBox);
 
-        // Selector de Fecha dentro del modal
-        LinearLayout dateRow = new LinearLayout(this);
-        dateRow.setOrientation(LinearLayout.HORIZONTAL);
-        dateRow.setGravity(Gravity.CENTER_VERTICAL);
-        dateRow.setPadding(0, dp(12), 0, dp(10));
-
-        TextView dateLbl = new TextView(this);
-        dateLbl.setText("Fecha de consulta:");
-        styleText(dateLbl, 13, COLOR_TEXT_GRAY, false);
-        dateRow.addView(dateLbl, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView dateBtn = new TextView(this);
-        dateBtn.setText(activePlaybackDate);
-        styleText(dateBtn, 13, COLOR_ACCENT_CYAN, true);
-        dateBtn.setBackground(roundBg("#151d2a", 8, COLOR_BORDER_DARK, 1));
-        dateBtn.setPadding(dp(12), dp(6), dp(12), dp(6));
-        dateBtn.setOnClickListener(v -> {
-            showDatePickerModal();
-            dateBtn.setText(activePlaybackDate);
-        });
-        dateRow.addView(dateBtn);
-        card.addView(dateRow);
-
-        // Contenedor scrollable de equipos y canales (Acordeon)
+        // 4. Contenedor scrollable con altura fija garantizada
         ScrollView scroll = new ScrollView(this);
-        scroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240)));
-        LinearLayout listContainer = new LinearLayout(this);
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(230));
+        scrollLp.topMargin = dp(8);
+        scroll.setLayoutParams(scrollLp);
+
+        final LinearLayout listContainer = new LinearLayout(this);
         listContainer.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(listContainer);
         card.addView(scroll);
 
         final CameraItem[] selectedChoice = new CameraItem[]{activePlaybackCamera};
 
-        Button btnStartPlayback = new Button(this);
-        btnStartPlayback.setText("Comenzar Playback");
+        final Button btnStartPlayback = new Button(this);
+        btnStartPlayback.setText(selectedChoice[0] != null ? "Comenzar Playback: " + selectedChoice[0].getShortChannelLabel() : "Comenzar Playback");
         btnStartPlayback.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         btnStartPlayback.setTextColor(Color.WHITE);
-        btnStartPlayback.setBackground(roundBg(selectedChoice[0] != null ? "#4f46e5" : "#27273a", 10, null, 0));
+        btnStartPlayback.setBackground(roundBg(selectedChoice[0] != null ? "#4f46e5" : "#20283e", 10, null, 0));
         LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        startLp.topMargin = dp(14);
+        startLp.topMargin = dp(12);
         card.addView(btnStartPlayback, startLp);
 
-        // Poblar acordeon de equipos y canales
-        Runnable renderList = () -> {
+        final Map<String, Boolean> expandedState = new HashMap<>();
+
+        final Runnable[] renderListHolder = new Runnable[1];
+        renderListHolder[0] = () -> {
             listContainer.removeAllViews();
             String filter = searchEt.getText().toString().trim().toLowerCase();
             Map<String, List<CameraItem>> grouped = getGroupedCameras(filter.isEmpty() ? null : filter);
+
+            if (grouped.isEmpty()) {
+                TextView emptyTv = new TextView(this);
+                emptyTv.setText("No se encontraron cámaras o equipos");
+                styleText(emptyTv, 12, COLOR_TEXT_GRAY, false);
+                emptyTv.setGravity(Gravity.CENTER);
+                emptyTv.setPadding(0, dp(24), 0, dp(24));
+                listContainer.addView(emptyTv);
+                return;
+            }
 
             for (Map.Entry<String, List<CameraItem>> entry : grouped.entrySet()) {
                 final String groupName = entry.getKey();
                 final List<CameraItem> cams = entry.getValue();
 
+                if (!expandedState.containsKey(groupName)) {
+                    expandedState.put(groupName, true);
+                }
+                final boolean isExpanded = Boolean.TRUE.equals(expandedState.get(groupName));
+
                 LinearLayout groupHeader = new LinearLayout(this);
                 groupHeader.setOrientation(LinearLayout.HORIZONTAL);
                 groupHeader.setGravity(Gravity.CENTER_VERTICAL);
-                groupHeader.setBackground(roundBg("#151d2a", 8, COLOR_BORDER_DARK, 1));
-                groupHeader.setPadding(dp(12), dp(10), dp(12), dp(10));
+                groupHeader.setBackground(roundBg("#161e2e", 8, COLOR_BORDER_DARK, 1));
+                groupHeader.setPadding(dp(10), dp(8), dp(10), dp(8));
                 LinearLayout.LayoutParams ghlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                ghlp.bottomMargin = dp(4);
+                ghlp.topMargin = dp(4);
+                ghlp.bottomMargin = dp(2);
 
-                groupHeader.addView(new LimenIcons.IconView(this, LimenIcons.ICON_CHEVRON_DOWN, COLOR_ACCENT_CYAN),
-                        new LinearLayout.LayoutParams(dp(14), dp(14)));
+                final LimenIcons.IconView chev = new LimenIcons.IconView(this, isExpanded ? LimenIcons.ICON_CHEVRON_DOWN : LimenIcons.ICON_CHEVRON_R, COLOR_ACCENT_CYAN);
+                groupHeader.addView(chev, new LinearLayout.LayoutParams(dp(14), dp(14)));
 
                 TextView gTitle = new TextView(this);
-                gTitle.setText(groupName + " (" + cams.size() + " canales)");
+                gTitle.setText(groupName);
                 styleText(gTitle, 13, COLOR_TEXT_WHITE, true);
-                gTitle.setPadding(dp(10), 0, 0, 0);
+                gTitle.setPadding(dp(8), 0, 0, 0);
                 groupHeader.addView(gTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+                TextView countBadge = new TextView(this);
+                countBadge.setText(cams.size() + " ch");
+                styleText(countBadge, 11, COLOR_TEXT_MUTED, false);
+                groupHeader.addView(countBadge);
 
                 listContainer.addView(groupHeader, ghlp);
 
-                LinearLayout channelsCol = new LinearLayout(this);
+                final LinearLayout channelsCol = new LinearLayout(this);
                 channelsCol.setOrientation(LinearLayout.VERTICAL);
-                channelsCol.setPadding(dp(16), 0, dp(4), dp(6));
+                channelsCol.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+                channelsCol.setPadding(dp(12), 0, dp(4), dp(4));
+
+                groupHeader.setOnClickListener(v -> {
+                    boolean nextState = !Boolean.TRUE.equals(expandedState.get(groupName));
+                    expandedState.put(groupName, nextState);
+                    channelsCol.setVisibility(nextState ? View.VISIBLE : View.GONE);
+                    chev.setIconType(nextState ? LimenIcons.ICON_CHEVRON_DOWN : LimenIcons.ICON_CHEVRON_R);
+                });
 
                 for (CameraItem cam : cams) {
+                    final CameraItem targetCam = cam;
                     LinearLayout chRow = new LinearLayout(this);
                     chRow.setOrientation(LinearLayout.HORIZONTAL);
                     chRow.setGravity(Gravity.CENTER_VERTICAL);
-                    chRow.setPadding(dp(8), dp(8), dp(8), dp(8));
+                    chRow.setPadding(dp(8), dp(7), dp(8), dp(7));
+
+                    boolean isSelected = selectedChoice[0] != null && selectedChoice[0].id == cam.id;
+                    chRow.setBackground(roundBg(isSelected ? "#1a253a" : "transparent", 6, isSelected ? COLOR_ACCENT_CYAN : null, isSelected ? 1 : 0));
+
+                    LimenIcons.IconView camIc = new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, isSelected ? COLOR_ACCENT_CYAN : COLOR_TEXT_GRAY);
+                    chRow.addView(camIc, new LinearLayout.LayoutParams(dp(16), dp(16)));
 
                     TextView chName = new TextView(this);
                     chName.setText(cam.getShortChannelLabel());
-                    styleText(chName, 13, COLOR_TEXT_WHITE, false);
+                    styleText(chName, 12, isSelected ? COLOR_TEXT_WHITE : COLOR_TEXT_GRAY, isSelected);
+                    chName.setPadding(dp(8), 0, 0, 0);
                     chRow.addView(chName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-                    // Radio indicator
-                    boolean isSelected = selectedChoice[0] != null && selectedChoice[0].id == cam.id;
                     FrameLayout radioCircle = new FrameLayout(this);
                     radioCircle.setBackground(circleBg(isSelected ? COLOR_ACCENT_CYAN : COLOR_BG_CARD,
-                            isSelected ? COLOR_ACCENT_CYAN : COLOR_TEXT_GRAY, 2));
-                    chRow.addView(radioCircle, new LinearLayout.LayoutParams(dp(18), dp(18)));
+                            isSelected ? COLOR_ACCENT_CYAN : COLOR_TEXT_MUTED, 2));
+                    chRow.addView(radioCircle, new LinearLayout.LayoutParams(dp(16), dp(16)));
 
                     chRow.setOnClickListener(v -> {
-                        selectedChoice[0] = cam;
+                        selectedChoice[0] = targetCam;
                         btnStartPlayback.setBackground(roundBg("#4f46e5", 10, null, 0));
-                        showPlaybackSelectorModal();
-                        dialog.dismiss();
+                        btnStartPlayback.setText("Comenzar Playback: " + targetCam.getShortChannelLabel());
+                        renderListHolder[0].run();
                     });
 
                     channelsCol.addView(chRow);
@@ -4423,11 +4532,11 @@ public class MainActivity extends AppCompatActivity {
 
         searchEt.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderList.run(); }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderListHolder[0].run(); }
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        renderList.run();
+        renderListHolder[0].run();
 
         btnStartPlayback.setOnClickListener(v -> {
             if (selectedChoice[0] == null) {
@@ -4439,6 +4548,7 @@ public class MainActivity extends AppCompatActivity {
             isPlaybackLoaded = true;
             if (playbackHeaderTitle != null) playbackHeaderTitle.setText(activePlaybackCamera.getShortChannelLabel());
             if (playbackHeaderSub != null) playbackHeaderSub.setText(activePlaybackCamera.getGroupTitle());
+            if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
 
             setupPlaybackCellWithPlayer();
             loadPlaybackTimeline();
