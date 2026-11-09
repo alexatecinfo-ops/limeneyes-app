@@ -27,7 +27,10 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build APKs (Release & Debug)
-      run: ./gradlew assembleRelease assembleDebug --stacktrace
+      run: |
+        ./gradlew assembleRelease assembleDebug --stacktrace
+        cp app/build/outputs/apk/release/app-release.apk LimenEyes_v2.5.1_beta.apk
+        cp app/build/outputs/apk/debug/app-debug.apk LimenEyes_v2.5.1_beta_debug.apk
 
     - name: Upload Release Artifact
       uses: actions/upload-artifact@v4
@@ -37,22 +40,22 @@ jobs:
 
     - name: Delete old release tag if exists
       run: |
-        gh release delete v2.5.0-beta --yes || true
-        git push origin :refs/tags/v2.5.0-beta || true
+        gh release delete v2.5.1-beta --yes || true
+        git push origin :refs/tags/v2.5.1-beta || true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release v2.5.0-beta
+    - name: Create GitHub Release v2.5.1-beta
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v2.5.0-beta
-        name: "LIMEN EYES v2.5.0-beta - Playback Grabaciones & Performance"
+        tag_name: v2.5.1-beta
+        name: "LIMEN EYES v2.5.1-beta - Playback Grabaciones & Performance"
         body: |
-          ### 📱 LIMEN EYES v2.5.0-beta - Plataforma Oficial de Monitoreo
+          ### 📱 LIMEN EYES v2.5.1-beta - Plataforma Oficial de Monitoreo
           - **Módulo de Grabaciones (Playback HDD)**: Lógica on-demand con regla de tiempo 24h interactiva y selector rápido.
           - **Compilación Release Firmada**: Certificación oficial de seguridad V1/V2 para instalación instantánea sin bloqueos de Play Protect.
         files: |
-          app/build/outputs/apk/release/app-release.apk
-          app/build/outputs/apk/debug/app-debug.apk
+          LimenEyes_v2.5.1_beta.apk
+          LimenEyes_v2.5.1_beta_debug.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.4.6";
+    private static final String APP_VERSION_NAME = "2.5.1-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -349,10 +349,20 @@ public class MainActivity extends AppCompatActivity {
 
     private GradientDrawable roundBg(String hexColor, int radiusDp, String strokeHex, int strokeDp) {
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor(hexColor));
+        if (hexColor == null || "#00000000".equalsIgnoreCase(hexColor)) {
+            gd.setColor(Color.TRANSPARENT);
+        } else {
+            try {
+                gd.setColor(Color.parseColor(hexColor));
+            } catch (Exception e) {
+                gd.setColor(Color.TRANSPARENT);
+            }
+        }
         gd.setCornerRadius(dp(radiusDp));
-        if (strokeHex != null && strokeDp > 0) {
-            gd.setStroke(dp(strokeDp), Color.parseColor(strokeHex));
+        if (strokeHex != null && strokeDp > 0 && !"#00000000".equalsIgnoreCase(strokeHex)) {
+            try {
+                gd.setStroke(dp(strokeDp), Color.parseColor(strokeHex));
+            } catch (Exception ignored) {}
         }
         return gd;
     }
@@ -360,9 +370,19 @@ public class MainActivity extends AppCompatActivity {
     private GradientDrawable circleBg(String hexColor, String strokeHex, int strokeDp) {
         GradientDrawable gd = new GradientDrawable();
         gd.setShape(GradientDrawable.OVAL);
-        gd.setColor(Color.parseColor(hexColor));
-        if (strokeHex != null && strokeDp > 0) {
-            gd.setStroke(dp(strokeDp), Color.parseColor(strokeHex));
+        if (hexColor == null || "#00000000".equalsIgnoreCase(hexColor)) {
+            gd.setColor(Color.TRANSPARENT);
+        } else {
+            try {
+                gd.setColor(Color.parseColor(hexColor));
+            } catch (Exception e) {
+                gd.setColor(Color.TRANSPARENT);
+            }
+        }
+        if (strokeHex != null && strokeDp > 0 && !"#00000000".equalsIgnoreCase(strokeHex)) {
+            try {
+                gd.setStroke(dp(strokeDp), Color.parseColor(strokeHex));
+            } catch (Exception ignored) {}
         }
         return gd;
     }
@@ -4502,7 +4522,7 @@ public class MainActivity extends AppCompatActivity {
                     chRow.setPadding(dp(8), dp(7), dp(8), dp(7));
 
                     boolean isSelected = selectedChoice[0] != null && selectedChoice[0].id == cam.id;
-                    chRow.setBackground(roundBg(isSelected ? "#1a253a" : "transparent", 6, isSelected ? COLOR_ACCENT_CYAN : null, isSelected ? 1 : 0));
+                    chRow.setBackground(roundBg(isSelected ? "#1a253a" : "#00000000", 6, isSelected ? COLOR_ACCENT_CYAN : null, isSelected ? 1 : 0));
 
                     LimenIcons.IconView camIc = new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, isSelected ? COLOR_ACCENT_CYAN : COLOR_TEXT_GRAY);
                     chRow.addView(camIc, new LinearLayout.LayoutParams(dp(16), dp(16)));
