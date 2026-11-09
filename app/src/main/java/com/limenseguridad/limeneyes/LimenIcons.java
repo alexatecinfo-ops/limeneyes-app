@@ -54,6 +54,10 @@ public class LimenIcons {
     public static final int ICON_EDIT         = 36;
     public static final int ICON_CHEVRON_DOWN = 37;
     public static final int ICON_LOGO_LIMEN   = 38;
+    public static final int ICON_CHEVRON_L   = 39;
+    public static final int ICON_DRAWER_LIST = 40;
+    public static final int ICON_FILMSTRIP   = 41;
+    public static final int ICON_SCISSORS    = 42;
 
     private static final Typeface ICON_TYPEFACE = Typeface.create("sans-serif-medium", Typeface.BOLD);
 
@@ -454,6 +458,45 @@ public class LimenIcons {
                     paint.setStyle(Paint.Style.FILL);
                     canvas.drawCircle(12 * s, 12 * s, 2.2f * s, paint);
                     paint.setStyle(Paint.Style.STROKE);
+                    break;
+                }
+                                case ICON_CHEVRON_L: {
+                    path.moveTo(15 * s, 18 * s);
+                    path.lineTo(9 * s, 12 * s);
+                    path.lineTo(15 * s, 6 * s);
+                    canvas.drawPath(path, paint);
+                    break;
+                }
+                case ICON_DRAWER_LIST: {
+                    path.moveTo(4 * s, 6 * s);
+                    path.lineTo(16 * s, 6 * s);
+                    path.moveTo(4 * s, 12 * s);
+                    path.lineTo(20 * s, 12 * s);
+                    path.moveTo(4 * s, 18 * s);
+                    path.lineTo(14 * s, 18 * s);
+                    canvas.drawPath(path, paint);
+                    break;
+                }
+                case ICON_FILMSTRIP: {
+                    rect.set(3.5f * s, 4.5f * s, 20.5f * s, 19.5f * s);
+                    canvas.drawRoundRect(rect, 2.5f * s, 2.5f * s, paint);
+                    path.moveTo(10 * s, 9f * s);
+                    path.lineTo(15.5f * s, 12 * s);
+                    path.lineTo(10 * s, 15f * s);
+                    path.close();
+                    paint.setStyle(Paint.Style.FILL);
+                    canvas.drawPath(path, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    break;
+                }
+                case ICON_SCISSORS: {
+                    canvas.drawCircle(7 * s, 7 * s, 2.5f * s, paint);
+                    canvas.drawCircle(7 * s, 17 * s, 2.5f * s, paint);
+                    path.moveTo(9 * s, 8 * s);
+                    path.lineTo(19 * s, 18 * s);
+                    path.moveTo(9 * s, 16 * s);
+                    path.lineTo(19 * s, 6 * s);
+                    canvas.drawPath(path, paint);
                     break;
                 }
                 case ICON_BADGE_1:
