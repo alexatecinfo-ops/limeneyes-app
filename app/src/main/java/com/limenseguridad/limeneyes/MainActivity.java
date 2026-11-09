@@ -61,6 +61,7 @@ import java.io.File;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
@@ -107,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.1-beta";
+    private static final String APP_VERSION_NAME = "2.5.2-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -3873,6 +3874,12 @@ public class MainActivity extends AppCompatActivity {
     private PlaybackTimelineRulerView playbackRulerView;
     private LinearLayout playbackIntervalsContainer;
     private FrameLayout[] playbackCells = new FrameLayout[4];
+    private LinearLayout playbackGridRow0;
+    private LinearLayout playbackGridRow1;
+    private boolean isPlaybackSingleCell = false;
+    private long lastPlaybackCellClickTime = 0;
+    private int lastClickedPlaybackCell = -1;
+    private LimenIcons.IconView playbackLayoutToggleIcon;
     private TextView playbackCellCamLabel;
     private TextView playbackCellTimeLabel;
     private LimenIcons.IconView playbackPlayPauseIcon;
@@ -3954,13 +3961,13 @@ public class MainActivity extends AppCompatActivity {
         gridContainer.setBackgroundColor(Color.parseColor("#050811"));
         gridContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, gridHeight));
 
-        LinearLayout row0 = new LinearLayout(this);
-        row0.setOrientation(LinearLayout.HORIZONTAL);
-        row0.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        playbackGridRow0 = new LinearLayout(this);
+        playbackGridRow0.setOrientation(LinearLayout.HORIZONTAL);
+        playbackGridRow0.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        LinearLayout row1 = new LinearLayout(this);
-        row1.setOrientation(LinearLayout.HORIZONTAL);
-        row1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        playbackGridRow1 = new LinearLayout(this);
+        playbackGridRow1.setOrientation(LinearLayout.HORIZONTAL);
+        playbackGridRow1.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         for (int i = 0; i < 4; i++) {
             final int cellIdx = i;
@@ -3970,7 +3977,7 @@ public class MainActivity extends AppCompatActivity {
             clp.setMargins(dp(1), dp(1), dp(1), dp(1));
             cell.setLayoutParams(clp);
 
-            // Borde focus en celda 0 seleccionada
+            // Borde focus en celda seleccionada
             if (cellIdx == selectedPlaybackCell) {
                 cell.setBackground(roundBg("#0b0f19", 4, COLOR_ACCENT_CYAN, 2));
             } else {
@@ -3987,20 +3994,30 @@ public class MainActivity extends AppCompatActivity {
             cell.addView(emptyBox, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
 
             cell.setOnClickListener(v -> {
+                long now = System.currentTimeMillis();
+                boolean isDoubleClick = (lastClickedPlaybackCell == cellIdx) && (now - lastPlaybackCellClickTime < 350);
+                lastPlaybackCellClickTime = now;
+                lastClickedPlaybackCell = cellIdx;
+
                 selectedPlaybackCell = cellIdx;
                 updatePlaybackGridFocus();
-                if (!isPlaybackLoaded || activePlaybackCamera == null) {
-                    showPlaybackSelectorModal();
+
+                if (isDoubleClick) {
+                    togglePlaybackGridMode(cellIdx);
+                } else {
+                    if (!isPlaybackLoaded || activePlaybackCamera == null) {
+                        showPlaybackSelectorModal();
+                    }
                 }
             });
 
             playbackCells[cellIdx] = cell;
-            if (cellIdx < 2) row0.addView(cell);
-            else row1.addView(cell);
+            if (cellIdx < 2) playbackGridRow0.addView(cell);
+            else playbackGridRow1.addView(cell);
         }
 
-        gridContainer.addView(row0);
-        gridContainer.addView(row1);
+        gridContainer.addView(playbackGridRow0);
+        gridContainer.addView(playbackGridRow1);
         page.addView(gridContainer);
 
         // ── 3. BARRA DE CONTROLES PRINCIPALES (Play, Speed, Step, Audio, Fullscreen - Imagen 1) ──
@@ -4044,11 +4061,11 @@ public class MainActivity extends AppCompatActivity {
         });
         primaryControls.addView(btnAudio, new LinearLayout.LayoutParams(0, dp(34), 1f));
 
-        // Pantalla completa
+        // Alternar vista Grilla 2x2 / 1x1
         FrameLayout btnFull = new FrameLayout(this);
-        btnFull.addView(new LimenIcons.IconView(this, LimenIcons.ICON_FULLSCREEN, COLOR_TEXT_WHITE),
-                new FrameLayout.LayoutParams(dp(19), dp(19), Gravity.CENTER));
-        btnFull.setOnClickListener(v -> toggleLandscapeFullscreen());
+        playbackLayoutToggleIcon = new LimenIcons.IconView(this, isPlaybackSingleCell ? LimenIcons.ICON_GRID : LimenIcons.ICON_FULLSCREEN, COLOR_TEXT_WHITE);
+        btnFull.addView(playbackLayoutToggleIcon, new FrameLayout.LayoutParams(dp(19), dp(19), Gravity.CENTER));
+        btnFull.setOnClickListener(v -> togglePlaybackGridMode(selectedPlaybackCell));
         primaryControls.addView(btnFull, new LinearLayout.LayoutParams(0, dp(34), 1f));
 
         page.addView(primaryControls);
@@ -4185,6 +4202,8 @@ public class MainActivity extends AppCompatActivity {
         // Si ya vino con una camara seleccionada explicitamente, cargar; sino aguardar a seleccion
         if (isPlaybackLoaded && activePlaybackCamera != null) {
             setupPlaybackCellWithPlayer();
+            isPlaybackSingleCell = true;
+            applyPlaybackGridLayout(selectedPlaybackCell);
             loadPlaybackTimeline();
         } else {
             renderPlaybackPromptToSelect();
@@ -4579,6 +4598,40 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void togglePlaybackGridMode(int targetCell) {
+        isPlaybackSingleCell = !isPlaybackSingleCell;
+        applyPlaybackGridLayout(targetCell);
+    }
+
+    private void applyPlaybackGridLayout(int targetCell) {
+        if (playbackGridRow0 == null || playbackGridRow1 == null) return;
+        if (targetCell < 0 || targetCell > 3) targetCell = 0;
+
+        if (playbackLayoutToggleIcon != null) {
+            playbackLayoutToggleIcon.setIconType(isPlaybackSingleCell ? LimenIcons.ICON_GRID : LimenIcons.ICON_FULLSCREEN);
+        }
+
+        if (isPlaybackSingleCell) {
+            if (targetCell < 2) {
+                playbackGridRow0.setVisibility(View.VISIBLE);
+                playbackGridRow1.setVisibility(View.GONE);
+                if (playbackCells[0] != null) playbackCells[0].setVisibility(targetCell == 0 ? View.VISIBLE : View.GONE);
+                if (playbackCells[1] != null) playbackCells[1].setVisibility(targetCell == 1 ? View.VISIBLE : View.GONE);
+            } else {
+                playbackGridRow0.setVisibility(View.GONE);
+                playbackGridRow1.setVisibility(View.VISIBLE);
+                if (playbackCells[2] != null) playbackCells[2].setVisibility(targetCell == 2 ? View.VISIBLE : View.GONE);
+                if (playbackCells[3] != null) playbackCells[3].setVisibility(targetCell == 3 ? View.VISIBLE : View.GONE);
+            }
+        } else {
+            playbackGridRow0.setVisibility(View.VISIBLE);
+            playbackGridRow1.setVisibility(View.VISIBLE);
+            for (int i = 0; i < 4; i++) {
+                if (playbackCells[i] != null) playbackCells[i].setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
     private void setupPlaybackCellWithPlayer() {
         if (playbackCells[selectedPlaybackCell] == null) return;
         FrameLayout cell = playbackCells[selectedPlaybackCell];
@@ -4589,6 +4642,9 @@ public class MainActivity extends AppCompatActivity {
         playbackPlayerView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
+        if (playbackPlayer != null) {
+            playbackPlayerView.setPlayer(playbackPlayer);
+        }
         cell.addView(playbackPlayerView);
 
         // Spinner
@@ -4871,13 +4927,17 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
 
-                if (playbackPlayerView != null) {
-                    playbackPlayerView.setPlayer(playbackPlayer);
-                }
+            }
+
+            if (playbackPlayerView != null && playbackPlayerView.getPlayer() != playbackPlayer) {
+                playbackPlayerView.setPlayer(playbackPlayer);
             }
 
             String fullUrl = BASE_URL + it.streamUrl;
-            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(fullUrl));
+            MediaItem mediaItem = new MediaItem.Builder()
+                    .setUri(Uri.parse(fullUrl))
+                    .setMimeType(MimeTypes.APPLICATION_MP4)
+                    .build();
             playbackPlayer.setMediaItem(mediaItem);
             playbackPlayer.prepare();
             playbackPlayer.setPlayWhenReady(true);
