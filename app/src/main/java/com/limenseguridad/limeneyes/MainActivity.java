@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.3-beta";
+    private static final String APP_VERSION_NAME = "2.5.4-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -4115,7 +4115,7 @@ public class MainActivity extends AppCompatActivity {
         datePill.addView(btnPrevDay);
 
         playbackDateLabel = new TextView(this);
-        playbackDateLabel.setText(activePlaybackDate);
+        playbackDateLabel.setText(formatDisplayDate(activePlaybackDate));
         styleText(playbackDateLabel, 13, COLOR_TEXT_WHITE, true);
         playbackDateLabel.setPadding(dp(12), 0, dp(10), 0);
         playbackDateLabel.setOnClickListener(v -> showPlaybackSelectorModal());
@@ -4242,6 +4242,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    
+    private String formatDisplayDate(String isoDate) {
+        if (isoDate == null) return "";
+        try {
+            String[] parts = isoDate.split("-");
+            if (parts.length == 3) {
+                return parts[2] + "-" + parts[1] + "-" + parts[0];
+            }
+        } catch (Exception ignored) {}
+        return isoDate;
+    }
+
     private void stepPlaybackDate(int deltaDays) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -4251,7 +4263,7 @@ public class MainActivity extends AppCompatActivity {
                 c.setTime(d);
                 c.add(Calendar.DAY_OF_MONTH, deltaDays);
                 activePlaybackDate = sdf.format(c.getTime());
-                if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+                if (playbackDateLabel != null) playbackDateLabel.setText(formatDisplayDate(activePlaybackDate));
                 if (isPlaybackLoaded && activePlaybackCamera != null) {
                     loadPlaybackTimeline();
                 }
@@ -4272,7 +4284,7 @@ public class MainActivity extends AppCompatActivity {
 
         DatePickerDialog dpd = new DatePickerDialog(this, AlertDialog.THEME_HOLO_DARK, (view, year, month, dayOfMonth) -> {
             activePlaybackDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
-            if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+            if (playbackDateLabel != null) playbackDateLabel.setText(formatDisplayDate(activePlaybackDate));
             if (isPlaybackLoaded && activePlaybackCamera != null) {
                 loadPlaybackTimeline();
             }
@@ -4378,7 +4390,7 @@ public class MainActivity extends AppCompatActivity {
         dateRow.addView(btnPrevModal);
 
         final TextView modalDateTv = new TextView(this);
-        modalDateTv.setText(activePlaybackDate);
+        modalDateTv.setText(formatDisplayDate(activePlaybackDate));
         styleText(modalDateTv, 14, COLOR_ACCENT_CYAN, true);
         modalDateTv.setGravity(Gravity.CENTER);
         dateRow.addView(modalDateTv, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -4399,12 +4411,12 @@ public class MainActivity extends AppCompatActivity {
 
         btnPrevModal.setOnClickListener(v -> {
             stepPlaybackDate(-1);
-            modalDateTv.setText(activePlaybackDate);
+            modalDateTv.setText(formatDisplayDate(activePlaybackDate));
         });
 
         btnNextModal.setOnClickListener(v -> {
             stepPlaybackDate(1);
-            modalDateTv.setText(activePlaybackDate);
+            modalDateTv.setText(formatDisplayDate(activePlaybackDate));
         });
 
         btnCalModal.setOnClickListener(v -> {
@@ -4420,8 +4432,8 @@ public class MainActivity extends AppCompatActivity {
 
             DatePickerDialog dpd = new DatePickerDialog(this, AlertDialog.THEME_HOLO_DARK, (vw, year, month, dayOfMonth) -> {
                 activePlaybackDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
-                modalDateTv.setText(activePlaybackDate);
-                if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+                modalDateTv.setText(formatDisplayDate(activePlaybackDate));
+                if (playbackDateLabel != null) playbackDateLabel.setText(formatDisplayDate(activePlaybackDate));
             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
             dpd.show();
         });
@@ -4603,7 +4615,7 @@ public class MainActivity extends AppCompatActivity {
             if (playbackHeaderSub != null) {
                 playbackHeaderSub.setText(activePlaybackCamera.getShortChannelLabel());
             }
-            if (playbackDateLabel != null) playbackDateLabel.setText(activePlaybackDate);
+            if (playbackDateLabel != null) playbackDateLabel.setText(formatDisplayDate(activePlaybackDate));
 
             setupPlaybackCellWithPlayer();
             loadPlaybackTimeline();
@@ -4680,7 +4692,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Overlay fecha y hora arriba derecha
         playbackCellTimeLabel = new TextView(this);
-        playbackCellTimeLabel.setText(activePlaybackDate);
+        playbackCellTimeLabel.setText(formatDisplayDate(activePlaybackDate));
         styleText(playbackCellTimeLabel, 10, COLOR_TEXT_WHITE, false);
         playbackCellTimeLabel.setBackground(roundBg("#88000000", 3, null, 0));
         playbackCellTimeLabel.setPadding(dp(5), dp(2), dp(5), dp(2));
@@ -4902,7 +4914,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
         if (playbackTimeDisplay != null) playbackTimeDisplay.setText(it.start);
-        if (playbackCellTimeLabel != null) playbackCellTimeLabel.setText(activePlaybackDate + " " + it.start);
+        if (playbackCellTimeLabel != null) playbackCellTimeLabel.setText(formatDisplayDate(activePlaybackDate) + " " + it.start);
         if (playbackRulerView != null) playbackRulerView.setCurrentSeconds(it.startSeconds);
 
         try {
