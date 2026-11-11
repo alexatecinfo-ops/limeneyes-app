@@ -1245,7 +1245,7 @@ public class MainActivity extends AppCompatActivity {
             Button btnRetry = new Button(this);
             btnRetry.setText("Reintentar");
             btnRetry.setTextColor(Color.WHITE);
-            btnRetry.setBackground(roundBg(COLOR_ACCENT, 8));
+            btnRetry.setBackground(roundBg(COLOR_BTN_BLUE, 8));
             btnRetry.setOnClickListener(v -> loadCamerasAndOpenHome());
             emptyLayout.addView(btnRetry, new LinearLayout.LayoutParams(dp(140), dp(38)));
 
