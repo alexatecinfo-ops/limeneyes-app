@@ -48,6 +48,10 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import android.os.Environment;
+import java.io.FileInputStream;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -111,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.5-beta";
+    private static final String APP_VERSION_NAME = "2.5.6-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -314,6 +318,19 @@ public class MainActivity extends AppCompatActivity {
             currentSubtype = prefs.getInt("default_subtype", 1);
 
             logAppEvent("Sistema Limen Seguridad activo");
+
+            // Cargar de inmediato desde la persistencia local para vista instantánea
+            if (prefs != null && allCameras.isEmpty()) {
+                String cached = prefs.getString("cached_cameras_list", "");
+                if (cached.isEmpty()) {
+                    cached = prefs.getString("cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default"), "");
+                }
+                if (!cached.isEmpty()) {
+                    try {
+                        allCameras.addAll(parseCamerasJson(new JSONArray(cached)));
+                    } catch (Exception ignored) {}
+                }
+            }
 
             if (authToken != null && !authToken.isEmpty()) {
                 loadCamerasAndOpenHome();
@@ -969,8 +986,11 @@ public class MainActivity extends AppCompatActivity {
     private void loadCamerasAndOpenHome() {
         // 1. Offline-First: Cargar de inmediato desde la caché local para cero tiempo de espera
         if (allCameras.isEmpty() && prefs != null) {
-            String cacheKey = "cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default");
-            String cached = prefs.getString(cacheKey, "");
+            String cached = prefs.getString("cached_cameras_list", "");
+            if (cached.isEmpty()) {
+                String cacheKey = "cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default");
+                cached = prefs.getString(cacheKey, "");
+            }
             if (!cached.isEmpty()) {
                 try {
                     List<CameraItem> cachedList = parseCamerasJson(new JSONArray(cached));
@@ -999,7 +1019,10 @@ public class MainActivity extends AppCompatActivity {
                     // Persistir en caché local del usuario para próximas aperturas offline
                     if (prefs != null) {
                         String cacheKey = "cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default");
-                        prefs.edit().putString(cacheKey, resp.body).apply();
+                        prefs.edit()
+                                .putString("cached_cameras_list", resp.body)
+                                .putString(cacheKey, resp.body)
+                                .apply();
                     }
 
                     // Pre-warming para clientes (no-admin): despertar su DVR al abrir la app
@@ -2327,7 +2350,7 @@ public class MainActivity extends AppCompatActivity {
 
             PlayerView pv = new PlayerView(this);
             pv.setUseController(false);
-            pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL);
+            pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
             pv.setBackgroundColor(Color.TRANSPARENT);
             cellFrame.addView(pv, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -3211,6 +3234,7 @@ public class MainActivity extends AppCompatActivity {
                 playbackPlayer.release();
             } catch (Throwable ignored) {}
             playbackPlayer = null;
+            cleanPlaybackCache();
         }
     }
 
@@ -4174,9 +4198,7 @@ public class MainActivity extends AppCompatActivity {
             else Toast.makeText(this, "Inicie primero la reproducción", Toast.LENGTH_SHORT).show();
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        circularTools.addView(createPlaybackCircleTool(LimenIcons.ICON_VIDEO, "Grabar", () -> {
-            Toast.makeText(this, "Grabando segmento de video...", Toast.LENGTH_SHORT).show();
-        }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        circularTools.addView(createPlaybackRecordButton(), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         circularTools.addView(createPlaybackCircleTool(LimenIcons.ICON_SCISSORS, "Cortar", () -> {
             Toast.makeText(this, "Marcador de inicio de clip fijado", Toast.LENGTH_SHORT).show();
@@ -4321,6 +4343,232 @@ public class MainActivity extends AppCompatActivity {
         col.addView(tv);
 
         return col;
+    }
+
+    private boolean isRecordingPlaybackClip = false;
+    private File activeClipRecordingFile = null;
+    private Thread activeClipRecordThread = null;
+    private FrameLayout playbackRecordCircle;
+    private LimenIcons.IconView playbackRecordIcon;
+    private TextView playbackRecordLabel;
+
+    private View createPlaybackRecordButton() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER);
+
+        playbackRecordCircle = new FrameLayout(this);
+        playbackRecordCircle.setBackground(circleBg(COLOR_BG_ELEVATED, COLOR_BORDER_DARK, 1));
+        playbackRecordIcon = new LimenIcons.IconView(this, LimenIcons.ICON_VIDEO, COLOR_TEXT_WHITE);
+        playbackRecordCircle.addView(playbackRecordIcon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        playbackRecordCircle.setOnClickListener(v -> togglePlaybackRecording());
+        col.addView(playbackRecordCircle, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+        playbackRecordLabel = new TextView(this);
+        playbackRecordLabel.setText("Grabar");
+        styleText(playbackRecordLabel, 10, COLOR_TEXT_GRAY, false);
+        playbackRecordLabel.setPadding(0, dp(4), 0, 0);
+        col.addView(playbackRecordLabel);
+
+        return col;
+    }
+
+    private void togglePlaybackRecording() {
+        if (playbackPlayer == null || currentlyPlayingInterval == null) {
+            Toast.makeText(this, "Inicie primero la reproducción para grabar un clip", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!isRecordingPlaybackClip) {
+            isRecordingPlaybackClip = true;
+            if (playbackRecordCircle != null) {
+                playbackRecordCircle.setBackground(circleBg("#DC2626", "#EF4444", 2));
+            }
+            if (playbackRecordIcon != null) {
+                playbackRecordIcon.setColorFilter(Color.WHITE);
+            }
+            if (playbackRecordLabel != null) {
+                playbackRecordLabel.setText("Detener");
+                playbackRecordLabel.setTextColor(Color.parseColor("#EF4444"));
+            }
+
+            final String streamUrl = BASE_URL + currentlyPlayingInterval.streamUrl;
+            final File clipFile = new File(getCacheDir(), "clip_" + System.currentTimeMillis() + ".mp4");
+            activeClipRecordingFile = clipFile;
+
+            Toast.makeText(this, "Grabando clip... Vuelve a tocar 'Detener' para guardar", Toast.LENGTH_SHORT).show();
+
+            activeClipRecordThread = new Thread(() -> {
+                try {
+                    URL u = new URL(streamUrl);
+                    HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(15000);
+                    conn.setRequestProperty("User-Agent", "LimenEyes-Recorder");
+                    conn.connect();
+                    try (InputStream in = conn.getInputStream();
+                         FileOutputStream fos = new FileOutputStream(clipFile)) {
+                        byte[] buf = new byte[16384];
+                        int r;
+                        while (isRecordingPlaybackClip && (r = in.read(buf)) != -1) {
+                            fos.write(buf, 0, r);
+                        }
+                        fos.flush();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error grabando clip", e);
+                }
+            });
+            activeClipRecordThread.start();
+
+        } else {
+            isRecordingPlaybackClip = false;
+            if (activeClipRecordThread != null) {
+                activeClipRecordThread.interrupt();
+                activeClipRecordThread = null;
+            }
+
+            if (playbackRecordCircle != null) {
+                playbackRecordCircle.setBackground(circleBg(COLOR_BG_ELEVATED, COLOR_BORDER_DARK, 1));
+            }
+            if (playbackRecordIcon != null) {
+                playbackRecordIcon.setColorFilter(Color.parseColor(COLOR_TEXT_WHITE));
+            }
+            if (playbackRecordLabel != null) {
+                playbackRecordLabel.setText("Grabar");
+                playbackRecordLabel.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
+            }
+
+            final File savedClip = activeClipRecordingFile;
+            if (savedClip != null && savedClip.exists() && savedClip.length() > 20000) {
+                String timestampStr = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                String title = "LimenEyes_" + (activePlaybackCamera != null ? activePlaybackCamera.nombre.replaceAll("[^a-zA-Z0-9_-]", "") : "Clip") + "_" + timestampStr;
+                saveVideoToGallery(savedClip, title);
+                showShareClipDialog(savedClip, title);
+            } else {
+                Toast.makeText(this, "Grabación muy corta, no se generó clip", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void saveVideoToGallery(File srcFile, String title) {
+        try {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Video.Media.TITLE, title);
+            values.put(MediaStore.Video.Media.DISPLAY_NAME, title + ".mp4");
+            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+            values.put(MediaStore.Video.Media.DATE_ADDED, System.currentTimeMillis() / 1000);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/LimenEyes");
+                values.put(MediaStore.Video.Media.IS_PENDING, 1);
+            }
+            Uri collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+            Uri itemUri = getContentResolver().insert(collection, values);
+            if (itemUri != null) {
+                try (InputStream in = new FileInputStream(srcFile);
+                     OutputStream out = getContentResolver().openOutputStream(itemUri)) {
+                    if (out != null) {
+                        byte[] buffer = new byte[8192];
+                        int read;
+                        while ((read = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, read);
+                        }
+                        out.flush();
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.clear();
+                    values.put(MediaStore.Video.Media.IS_PENDING, 0);
+                    getContentResolver().update(itemUri, values, null, null);
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Error saving video to gallery", t);
+        }
+    }
+
+    private void shareVideoFile(File videoFile) {
+        try {
+            Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    this,
+                    getPackageName() + ".provider",
+                    videoFile
+            );
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("video/mp4");
+            share.putExtra(Intent.EXTRA_STREAM, contentUri);
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "Compartir clip grabado"));
+        } catch (Throwable t) {
+            Log.e(TAG, "Error sharing video file", t);
+            Toast.makeText(this, "No se pudo compartir el video", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showShareClipDialog(File clipFile, String title) {
+        final Dialog dialog = createCustomLimenDialog();
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("Clip guardado en la galería");
+        styleText(tvTitle, 16, COLOR_TEXT_WHITE, true);
+        tvTitle.setGravity(Gravity.CENTER);
+        card.addView(tvTitle);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText("El video ha sido guardado exitosamente en tu teléfono (Películas / LimenEyes).\n\n¿Deseas compartirlo ahora por WhatsApp u otra aplicación?");
+        styleText(tvMsg, 13, COLOR_TEXT_GRAY, false);
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding(0, dp(10), 0, dp(20));
+        card.addView(tvMsg);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button btnClose = new Button(this);
+        btnClose.setText("Listo");
+        btnClose.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
+        btnClose.setBackground(roundBg(COLOR_BG_ELEVATED, 8, COLOR_BORDER_DARK, 1));
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        btnRow.addView(btnClose, new LinearLayout.LayoutParams(0, dp(40), 1f));
+
+        View spacer = new View(this);
+        btnRow.addView(spacer, new LinearLayout.LayoutParams(dp(10), 1));
+
+        Button btnShare = new Button(this);
+        btnShare.setText("Compartir");
+        btnShare.setTextColor(Color.WHITE);
+        btnShare.setBackground(roundBg(COLOR_BTN_BLUE, 8, null, 0));
+        btnShare.setOnClickListener(v -> {
+            dialog.dismiss();
+            shareVideoFile(clipFile);
+        });
+        btnRow.addView(btnShare, new LinearLayout.LayoutParams(0, dp(40), 1f));
+
+        card.addView(btnRow);
+        dialog.setContentView(card);
+        dialog.show();
+    }
+
+    private void cleanPlaybackCache() {
+        executor.execute(() -> {
+            try {
+                File dir = getCacheDir();
+                File[] list = dir.listFiles();
+                if (list != null) {
+                    for (File f : list) {
+                        if (f.getName().startsWith("playback_cache_") || (f.getName().startsWith("clip_") && !f.getName().equals(activeClipRecordingFile != null ? activeClipRecordingFile.getName() : ""))) {
+                            //noinspection ResultOfMethodCallIgnored
+                            f.delete();
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     private void updatePlaybackGridFocus() {
@@ -4761,7 +5009,7 @@ public class MainActivity extends AppCompatActivity {
 
         playbackPlayerView = new PlayerView(this);
         playbackPlayerView.setUseController(false);
-        playbackPlayerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL);
+        playbackPlayerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         playbackPlayerView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
@@ -5030,7 +5278,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (playbackPlayer == null) {
                 DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(2000, 10000, 500, 1500)
+                        .setBufferDurationsMs(2000, 30000, 1000, 2000)
                         .setPrioritizeTimeOverSizeThresholds(true)
                         .build();
 
