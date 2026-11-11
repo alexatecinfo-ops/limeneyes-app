@@ -931,6 +931,20 @@ public class MainActivity extends AppCompatActivity {
         showLoginScreen();
     }
 
+    
+    private void prewarmDvrConnection(String sn) {
+        if (sn == null || sn.trim().isEmpty() || authToken == null || authToken.isEmpty()) return;
+        final String cleanSn = sn.trim();
+        executor.execute(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("sn", cleanSn);
+                httpPostJson(BASE_URL + "/api/dvr/prewarm", body.toString(), authToken);
+                Log.d(TAG, "Pre-warm disparado para SN: " + cleanSn);
+            } catch (Exception ignored) {}
+        });
+    }
+
     private void loadCamerasAndOpenHome() {
         showHomeScreen();
         executor.execute(() -> {
@@ -952,6 +966,19 @@ public class MainActivity extends AppCompatActivity {
                     item.clienteNombre = o.optString("cliente_nombre", "");
                     item.marca = o.optString("marca", "Dahua");
                     loaded.add(item);
+                }
+                // Pre-warming para clientes (no-admin): despertar su DVR al abrir la app
+                boolean isAdminRole = "admin".equalsIgnoreCase(currentUserRole) || "operador".equalsIgnoreCase(currentUserRole);
+                if (!isAdminRole) {
+                    Set<String> clientSns = new HashSet<>();
+                    for (CameraItem it : loaded) {
+                        if (it.sn != null && !it.sn.trim().isEmpty()) {
+                            clientSns.add(it.sn.trim());
+                        }
+                    }
+                    for (String s : clientSns) {
+                        prewarmDvrConnection(s);
+                    }
                 }
                 mainHandler.post(() -> {
                     allCameras.clear();
@@ -4577,6 +4604,9 @@ public class MainActivity extends AppCompatActivity {
                         selectedChoice[0] = targetCam;
                         btnStartPlayback.setBackground(roundBg("#2563eb", 10, null, 0));
                         btnStartPlayback.setText("Comenzar Playback");
+                        if (targetCam != null && targetCam.sn != null) {
+                            prewarmDvrConnection(targetCam.sn);
+                        }
                         renderListHolder[0].run();
                     });
 
