@@ -11,7 +11,7 @@ android {
         applicationId 'com.limenseguridad.limeneyes'
         minSdk 24
         targetSdk 34
-        versionCode 20
+        versionCode 21
         versionName '2.5.5-beta'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'

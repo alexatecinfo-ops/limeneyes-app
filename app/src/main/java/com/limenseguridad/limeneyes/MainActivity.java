@@ -3911,6 +3911,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView playbackCellTimeLabel;
     private LimenIcons.IconView playbackPlayPauseIcon;
     private boolean isPlaybackPlaying = false;
+    private boolean isPlaybackLoading = false;
+    private long lastPlayClickTime = 0L;
     private RecordingInterval currentlyPlayingInterval = null;
 
     private void showPlaybackScreen(CameraItem initialCam) {
@@ -4940,7 +4942,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void playRecordingInterval(RecordingInterval it) {
         if (it == null || it.streamUrl == null || it.streamUrl.isEmpty()) return;
+
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastPlayClickTime < 600) {
+            Log.d(TAG, "playRecordingInterval debounce ignorado");
+            return;
+        }
+        lastPlayClickTime = now;
+
+        if (isPlaybackLoading && currentlyPlayingInterval != null && it.streamUrl.equals(currentlyPlayingInterval.streamUrl)) {
+            Log.d(TAG, "playRecordingInterval ya cargando este clip: " + it.streamUrl);
+            return;
+        }
+
         currentlyPlayingInterval = it;
+        isPlaybackLoading = true;
 
         if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
         if (playbackTimeDisplay != null) playbackTimeDisplay.setText(it.start);
@@ -4967,11 +4983,13 @@ public class MainActivity extends AppCompatActivity {
                             if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
                             if (playbackPlayPauseIcon != null) playbackPlayPauseIcon.setIconType(LimenIcons.ICON_PAUSE);
                             isPlaybackPlaying = true;
+                            isPlaybackLoading = false;
                         } else if (state == Player.STATE_BUFFERING) {
                             if (playbackSpinner != null) playbackSpinner.setVisibility(View.VISIBLE);
                         } else if (state == Player.STATE_ENDED) {
                             if (playbackPlayPauseIcon != null) playbackPlayPauseIcon.setIconType(LimenIcons.ICON_PLAY);
                             isPlaybackPlaying = false;
+                            isPlaybackLoading = false;
                         }
                     }
 
@@ -4982,10 +5000,13 @@ public class MainActivity extends AppCompatActivity {
                         if (playbackSpinner != null) playbackSpinner.setVisibility(View.GONE);
                         if (playbackPlayPauseIcon != null) playbackPlayPauseIcon.setIconType(LimenIcons.ICON_PLAY);
                         isPlaybackPlaying = false;
+                        isPlaybackLoading = false;
                         Toast.makeText(MainActivity.this, "Error de transmisión de grabación", Toast.LENGTH_SHORT).show();
                     }
                 });
 
+            } else {
+                playbackPlayer.stop();
             }
 
             if (playbackPlayerView != null && playbackPlayerView.getPlayer() != playbackPlayer) {
@@ -4995,8 +5016,8 @@ public class MainActivity extends AppCompatActivity {
             String fullUrl = BASE_URL + it.streamUrl;
             androidx.media3.datasource.DefaultHttpDataSource.Factory httpDataSourceFactory =
                     new androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                            .setConnectTimeoutMs(30000)
-                            .setReadTimeoutMs(30000)
+                            .setConnectTimeoutMs(60000)
+                            .setReadTimeoutMs(60000)
                             .setAllowCrossProtocolRedirects(true);
             androidx.media3.exoplayer.source.ProgressiveMediaSource mediaSource =
                     new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(httpDataSourceFactory)
@@ -5005,6 +5026,7 @@ public class MainActivity extends AppCompatActivity {
             playbackPlayer.prepare();
             playbackPlayer.setPlayWhenReady(true);
         } catch (Throwable t) {
+            isPlaybackLoading = false;
             reportCrashToServer("playRecordingInterval error", t);
         }
     }
