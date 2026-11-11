@@ -2327,7 +2327,7 @@ public class MainActivity extends AppCompatActivity {
 
             PlayerView pv = new PlayerView(this);
             pv.setUseController(false);
-            pv.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
+            pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL);
             pv.setBackgroundColor(Color.TRANSPARENT);
             cellFrame.addView(pv, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -3132,7 +3132,7 @@ public class MainActivity extends AppCompatActivity {
                         .setLoadControl(loadControl)
                         .build();
 
-                player.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+                player.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
                 player.setVolume(isMuted ? 0f : 1f);
 
                 player.addListener(new Player.Listener() {
@@ -4761,6 +4761,7 @@ public class MainActivity extends AppCompatActivity {
 
         playbackPlayerView = new PlayerView(this);
         playbackPlayerView.setUseController(false);
+        playbackPlayerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL);
         playbackPlayerView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ));
@@ -5037,7 +5038,7 @@ public class MainActivity extends AppCompatActivity {
                         .setLoadControl(loadControl)
                         .build();
 
-                playbackPlayer.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+                playbackPlayer.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
 
                 playbackPlayer.addListener(new Player.Listener() {
                     @Override
