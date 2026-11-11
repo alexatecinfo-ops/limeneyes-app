@@ -4385,7 +4385,7 @@ public class MainActivity extends AppCompatActivity {
                 playbackRecordCircle.setBackground(circleBg("#DC2626", "#EF4444", 2));
             }
             if (playbackRecordIcon != null) {
-                playbackRecordIcon.setColorFilter(Color.WHITE);
+                playbackRecordIcon.setIconColor("#FFFFFF");
             }
             if (playbackRecordLabel != null) {
                 playbackRecordLabel.setText("Detener");
@@ -4432,7 +4432,7 @@ public class MainActivity extends AppCompatActivity {
                 playbackRecordCircle.setBackground(circleBg(COLOR_BG_ELEVATED, COLOR_BORDER_DARK, 1));
             }
             if (playbackRecordIcon != null) {
-                playbackRecordIcon.setColorFilter(Color.parseColor(COLOR_TEXT_WHITE));
+                playbackRecordIcon.setIconColor(COLOR_TEXT_WHITE);
             }
             if (playbackRecordLabel != null) {
                 playbackRecordLabel.setText("Grabar");
