@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.4-beta";
+    private static final String APP_VERSION_NAME = "2.5.5-beta";
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -4963,8 +4963,15 @@ public class MainActivity extends AppCompatActivity {
             }
 
             String fullUrl = BASE_URL + it.streamUrl;
-            MediaItem mediaItem = MediaItem.fromUri(Uri.parse(fullUrl));
-            playbackPlayer.setMediaItem(mediaItem);
+            androidx.media3.datasource.DefaultHttpDataSource.Factory httpDataSourceFactory =
+                    new androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                            .setConnectTimeoutMs(30000)
+                            .setReadTimeoutMs(30000)
+                            .setAllowCrossProtocolRedirects(true);
+            androidx.media3.exoplayer.source.ProgressiveMediaSource mediaSource =
+                    new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(httpDataSourceFactory)
+                            .createMediaSource(MediaItem.fromUri(Uri.parse(fullUrl)));
+            playbackPlayer.setMediaSource(mediaSource);
             playbackPlayer.prepare();
             playbackPlayer.setPlayWhenReady(true);
         } catch (Throwable t) {
