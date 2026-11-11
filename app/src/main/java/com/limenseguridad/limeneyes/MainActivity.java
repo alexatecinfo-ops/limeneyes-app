@@ -948,8 +948,43 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private List<CameraItem> parseCamerasJson(JSONArray arr) {
+        List<CameraItem> list = new ArrayList<>();
+        if (arr == null) return list;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            CameraItem item = new CameraItem();
+            item.id = o.optInt("id");
+            item.nombre = o.optString("nombre", "CAM " + (i + 1));
+            item.sn = o.optString("sn", "");
+            item.canal = o.optInt("canal", 1);
+            item.clienteNombre = o.optString("cliente_nombre", "");
+            item.marca = o.optString("marca", "Dahua");
+            list.add(item);
+        }
+        return list;
+    }
+
     private void loadCamerasAndOpenHome() {
+        // 1. Offline-First: Cargar de inmediato desde la caché local para cero tiempo de espera
+        if (allCameras.isEmpty() && prefs != null) {
+            String cacheKey = "cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default");
+            String cached = prefs.getString(cacheKey, "");
+            if (!cached.isEmpty()) {
+                try {
+                    List<CameraItem> cachedList = parseCamerasJson(new JSONArray(cached));
+                    if (!cachedList.isEmpty()) {
+                        allCameras.addAll(cachedList);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // Renderizar inmediatamente la UI con los equipos y canales conocidos
         showHomeScreen();
+
+        // 2. Sincronización en segundo plano con el servidor
         executor.execute(() -> {
             try {
                 HttpResponse resp = httpGet(BASE_URL + "/api/camaras", authToken);
@@ -957,42 +992,47 @@ public class MainActivity extends AppCompatActivity {
                     mainHandler.post(this::logout);
                     return;
                 }
-                JSONArray arr = new JSONArray(resp.body);
-                List<CameraItem> loaded = new ArrayList<>();
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    CameraItem item = new CameraItem();
-                    item.id = o.optInt("id");
-                    item.nombre = o.optString("nombre", "CAM " + (i + 1));
-                    item.sn = o.optString("sn", "");
-                    item.canal = o.optInt("canal", 1);
-                    item.clienteNombre = o.optString("cliente_nombre", "");
-                    item.marca = o.optString("marca", "Dahua");
-                    loaded.add(item);
-                }
-                // Pre-warming para clientes (no-admin): despertar su DVR al abrir la app
-                boolean isAdminRole = "admin".equalsIgnoreCase(currentUserRole) || "operador".equalsIgnoreCase(currentUserRole);
-                if (!isAdminRole) {
-                    Set<String> clientSns = new HashSet<>();
-                    for (CameraItem it : loaded) {
-                        if (it.sn != null && !it.sn.trim().isEmpty()) {
-                            clientSns.add(it.sn.trim());
+                if (resp.code == 200 && resp.body != null) {
+                    JSONArray arr = new JSONArray(resp.body);
+                    List<CameraItem> loaded = parseCamerasJson(arr);
+
+                    // Persistir en caché local del usuario para próximas aperturas offline
+                    if (prefs != null) {
+                        String cacheKey = "cached_cameras_" + (currentUserEmail != null ? currentUserEmail.trim().toLowerCase() : "default");
+                        prefs.edit().putString(cacheKey, resp.body).apply();
+                    }
+
+                    // Pre-warming para clientes (no-admin): despertar su DVR al abrir la app
+                    boolean isAdminRole = "admin".equalsIgnoreCase(currentUserRole) || "operador".equalsIgnoreCase(currentUserRole);
+                    if (!isAdminRole) {
+                        Set<String> clientSns = new HashSet<>();
+                        for (CameraItem it : loaded) {
+                            if (it.sn != null && !it.sn.trim().isEmpty()) {
+                                clientSns.add(it.sn.trim());
+                            }
+                        }
+                        for (String s : clientSns) {
+                            prewarmDvrConnection(s);
                         }
                     }
-                    for (String s : clientSns) {
-                        prewarmDvrConnection(s);
-                    }
+
+                    mainHandler.post(() -> {
+                        allCameras.clear();
+                        allCameras.addAll(loaded);
+                        logAppEvent("Sincronizados " + allCameras.size() + " canales en línea");
+                        checkForUpdates(false);
+                        if (currentTab == 0) showHomeScreen();
+                        checkPendingInvitations();
+                    });
                 }
-                mainHandler.post(() -> {
-                    allCameras.clear();
-                    allCameras.addAll(loaded);
-                    logAppEvent("Sincronizados " + allCameras.size() + " canales en línea");
-                    checkForUpdates(false);
-                    if (currentTab == 0) showHomeScreen();
-                    checkPendingInvitations();
-                });
             } catch (Exception e) {
-                Log.e(TAG, "Error obteniendo cámaras", e);
+                Log.e(TAG, "Error obteniendo cámaras del servidor", e);
+                // Si la red falla pero ya teníamos cámaras en caché, se mantienen visibles en pantalla
+                mainHandler.post(() -> {
+                    if (allCameras.isEmpty() && currentTab == 0) {
+                        showHomeScreen();
+                    }
+                });
             }
         });
     }
@@ -1184,12 +1224,32 @@ public class MainActivity extends AppCompatActivity {
         devicesContainer.removeAllViews();
 
         if (allCameras.isEmpty()) {
+            LinearLayout emptyLayout = new LinearLayout(this);
+            emptyLayout.setOrientation(LinearLayout.VERTICAL);
+            emptyLayout.setGravity(Gravity.CENTER);
+            emptyLayout.setPadding(dp(20), dp(40), dp(20), dp(40));
+
             TextView empty = new TextView(this);
-            empty.setText("Sincronizando equipos autorizados...");
-            styleText(empty, 13, COLOR_TEXT_GRAY, false);
+            empty.setText("Sin conexión con el servidor");
+            styleText(empty, 14, COLOR_TEXT_WHITE, true);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(20), dp(40), dp(20), dp(40));
-            devicesContainer.addView(empty);
+            emptyLayout.addView(empty);
+
+            TextView sub = new TextView(this);
+            sub.setText("No se pudieron cargar los equipos. Toca para reintentar.");
+            styleText(sub, 12, COLOR_TEXT_GRAY, false);
+            sub.setGravity(Gravity.CENTER);
+            sub.setPadding(0, dp(4), 0, dp(14));
+            emptyLayout.addView(sub);
+
+            Button btnRetry = new Button(this);
+            btnRetry.setText("Reintentar");
+            btnRetry.setTextColor(Color.WHITE);
+            btnRetry.setBackground(roundBg(COLOR_ACCENT, 8));
+            btnRetry.setOnClickListener(v -> loadCamerasAndOpenHome());
+            emptyLayout.addView(btnRetry, new LinearLayout.LayoutParams(dp(140), dp(38)));
+
+            devicesContainer.addView(emptyLayout);
             return;
         }
 
