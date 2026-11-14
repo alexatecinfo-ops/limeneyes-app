@@ -32,6 +32,10 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.GestureDetector;
+import android.view.ScaleGestureDetector;
+import android.view.SurfaceView;
+import android.view.PixelCopy;
 import android.view.TextureView;
 import android.view.View;
 import android.view.MotionEvent;
@@ -115,7 +119,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL = "https://eyes.limenseguridad.com";
     private static final String PREFS_NAME = "LimenEyesPrefs";
     private static final String KEY_COMPACT_HOME = "compact_home_mode";
-    private static final String APP_VERSION_NAME = "2.5.6-beta";
+    private static final String APP_VERSION_NAME = "2.5.8-beta";
+    private float currentPlaybackSpeed = 1.0f;
+    private boolean autoSwitchedToHd = false;
 
     // Paleta Oficial Limen Seguridad (Obsidian / Slate / Electric Blue & Cyan)
     private static final String COLOR_BG_MAIN      = "#080B14";
@@ -2073,14 +2079,12 @@ public class MainActivity extends AppCompatActivity {
                         cam -> playCameraInCell(selectedCellIndex, cam))),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        // Botón 2: Capturar imagen
+        // Botón 2: Capturar imagen (Snapshot a Galería + Opción de Compartir)
         circleRow.addView(createConsoleCircleButton(LimenIcons.ICON_CAMERA, "Capturar",
                 v -> {
                     CellHolder h = cellHolders.get(selectedCellIndex);
-                    if (h.activeCamera != null) {
-                        captureCurrentFrameToCache(h, h.activeCamera.id);
-                        logAppEvent("Captura guardada: " + h.activeCamera.getCompactBadgeLabel());
-                        Toast.makeText(this, "Captura actualizada: " + h.activeCamera.getCompactBadgeLabel(), Toast.LENGTH_SHORT).show();
+                    if (h.activeCamera != null && h.playerView != null) {
+                        captureAndShareSnapshot(h.playerView, h.activeCamera.getGroupTitle() + " - " + h.activeCamera.getCompactBadgeLabel(), h.activeCamera.id);
                     } else {
                         Toast.makeText(this, "Selecciona primero un canal activo", Toast.LENGTH_SHORT).show();
                     }
@@ -2334,6 +2338,8 @@ public class MainActivity extends AppCompatActivity {
             holder.index = cellIdx;
 
             FrameLayout cellFrame = new FrameLayout(this);
+            cellFrame.setClipChildren(true);
+            cellFrame.setClipToPadding(true);
             cellFrame.setBackground(roundBg(
                     COLOR_BG_CELL, 0,
                     cellIdx == selectedCellIndex ? COLOR_ACCENT_CYAN : COLOR_BORDER_DARK,
@@ -2405,31 +2411,46 @@ public class MainActivity extends AppCompatActivity {
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START
             ));
 
-            cellFrame.setOnClickListener(v -> {
-                long now = System.currentTimeMillis();
-                if (now - holder.lastTapTime < 350) {
-                    selectedCellIndex = cellIdx;
-                    if (currentGridMode == 1) {
-                        switchGridMode(countActiveCells() > 4 ? 9 : 4);
-                    } else {
-                        switchGridMode(1);
-                    }
-                } else {
-                    selectCell(cellIdx);
-                    if (holder.activeCamera == null) {
+            attachZoomAndPanGesture(cellFrame, pv,
+                    () -> {
+                        selectCell(cellIdx);
+                        if (holder.activeCamera == null) {
+                            showCustomCameraPickerModal(activeLiveGroupFilter, getCamerasForCurrentLiveFilter(),
+                                    cam -> playCameraInCell(cellIdx, cam));
+                        }
+                    },
+                    () -> {
+                        selectedCellIndex = cellIdx;
+                        if (currentGridMode == 1) {
+                            int nextMode = countActiveCells() > 4 ? 9 : 4;
+                            if (autoSwitchedToHd && currentSubtype == 0) {
+                                currentSubtype = 1;
+                                autoSwitchedToHd = false;
+                                if (iconQualityView != null) {
+                                    iconQualityView.setIconType(LimenIcons.ICON_SD);
+                                    iconQualityView.setIconColor(COLOR_TEXT_WHITE);
+                                }
+                            }
+                            switchGridMode(nextMode);
+                        } else {
+                            if (currentSubtype == 1 && holder.activeCamera != null) {
+                                currentSubtype = 0;
+                                autoSwitchedToHd = true;
+                                if (iconQualityView != null) {
+                                    iconQualityView.setIconType(LimenIcons.ICON_HD);
+                                    iconQualityView.setIconColor(COLOR_ACCENT_CYAN);
+                                }
+                                playCameraInCell(cellIdx, holder.activeCamera);
+                            }
+                            switchGridMode(1);
+                        }
+                    },
+                    () -> {
+                        selectCell(cellIdx);
                         showCustomCameraPickerModal(activeLiveGroupFilter, getCamerasForCurrentLiveFilter(),
                                 cam -> playCameraInCell(cellIdx, cam));
                     }
-                }
-                holder.lastTapTime = now;
-            });
-
-            cellFrame.setOnLongClickListener(v -> {
-                selectCell(cellIdx);
-                showCustomCameraPickerModal(activeLiveGroupFilter, getCamerasForCurrentLiveFilter(),
-                        cam -> playCameraInCell(cellIdx, cam));
-                return true;
-            });
+            );
 
             holder.container = cellFrame;
             holder.thumbPreview = thumbBg;
@@ -2453,6 +2474,105 @@ public class MainActivity extends AppCompatActivity {
         applyGridVisibility();
     }
 
+    private void attachZoomAndPanGesture(final View container, final View targetView,
+                                         final Runnable onSingleTap, final Runnable onDoubleTap,
+                                         final Runnable onLongPress) {
+        final float[] scale = {1.0f};
+        final float[] posX = {0f};
+        final float[] posY = {0f};
+        final float[] lastTouchX = {0f};
+        final float[] lastTouchY = {0f};
+        final boolean[] isDragging = {false};
+
+        ScaleGestureDetector scaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                scale[0] *= detector.getScaleFactor();
+                scale[0] = Math.max(1.0f, Math.min(scale[0], 6.0f));
+                targetView.setScaleX(scale[0]);
+                targetView.setScaleY(scale[0]);
+                if (scale[0] <= 1.02f) {
+                    posX[0] = 0f;
+                    posY[0] = 0f;
+                    targetView.setTranslationX(0f);
+                    targetView.setTranslationY(0f);
+                } else {
+                    float maxDx = (targetView.getWidth() * (scale[0] - 1.0f)) / 2f;
+                    float maxDy = (targetView.getHeight() * (scale[0] - 1.0f)) / 2f;
+                    posX[0] = Math.max(-maxDx, Math.min(maxDx, posX[0]));
+                    posY[0] = Math.max(-maxDy, Math.min(maxDy, posY[0]));
+                    targetView.setTranslationX(posX[0]);
+                    targetView.setTranslationY(posY[0]);
+                }
+                return true;
+            }
+        });
+
+        GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
+                if (onSingleTap != null) onSingleTap.run();
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(@NonNull MotionEvent e) {
+                if (scale[0] > 1.05f) {
+                    scale[0] = 1.0f;
+                    posX[0] = 0f;
+                    posY[0] = 0f;
+                    targetView.animate().scaleX(1.0f).scaleY(1.0f).translationX(0f).translationY(0f).setDuration(180).start();
+                } else if (onDoubleTap != null) {
+                    onDoubleTap.run();
+                }
+                return true;
+            }
+
+            @Override
+            public void onLongPress(@NonNull MotionEvent e) {
+                if (scale[0] <= 1.05f && onLongPress != null) {
+                    onLongPress.run();
+                }
+            }
+        });
+
+        container.setOnTouchListener((v, event) -> {
+            if (event.getPointerCount() > 1 || scale[0] > 1.05f) {
+                if (v.getParent() != null) {
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                }
+            }
+            scaleDetector.onTouchEvent(event);
+            gestureDetector.onTouchEvent(event);
+
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                lastTouchX[0] = event.getX();
+                lastTouchY[0] = event.getY();
+                isDragging[0] = false;
+            } else if (action == MotionEvent.ACTION_MOVE && !scaleDetector.isInProgress() && event.getPointerCount() == 1 && scale[0] > 1.05f) {
+                float dx = event.getX() - lastTouchX[0];
+                float dy = event.getY() - lastTouchY[0];
+                if (Math.abs(dx) > 2f || Math.abs(dy) > 2f) {
+                    isDragging[0] = true;
+                }
+                if (isDragging[0]) {
+                    posX[0] += dx;
+                    posY[0] += dy;
+                    float maxDx = (targetView.getWidth() * (scale[0] - 1.0f)) / 2f;
+                    float maxDy = (targetView.getHeight() * (scale[0] - 1.0f)) / 2f;
+                    posX[0] = Math.max(-maxDx, Math.min(maxDx, posX[0]));
+                    posY[0] = Math.max(-maxDy, Math.min(maxDy, posY[0]));
+                    targetView.setTranslationX(posX[0]);
+                    targetView.setTranslationY(posY[0]);
+                    lastTouchX[0] = event.getX();
+                    lastTouchY[0] = event.getY();
+                }
+            }
+            return true;
+        });
+    }
+
     private void selectCell(int idx) {
         selectedCellIndex = idx;
         for (int i = 0; i < cellHolders.size(); i++) {
@@ -2467,6 +2587,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void switchGridMode(int mode) {
         currentGridMode = mode;
+        for (CellHolder h : cellHolders) {
+            if (h.playerView != null) {
+                h.playerView.setScaleX(1.0f);
+                h.playerView.setScaleY(1.0f);
+                h.playerView.setTranslationX(0f);
+                h.playerView.setTranslationY(0f);
+            }
+        }
         if (selectedCellIndex >= mode) {
             selectedCellIndex = 0;
         }
@@ -3055,6 +3183,21 @@ public class MainActivity extends AppCompatActivity {
                         } catch (Exception ignored) {}
                     });
                 }
+            } else if (surface instanceof SurfaceView && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                SurfaceView sv = (SurfaceView) surface;
+                if (sv.getWidth() > 0 && sv.getHeight() > 0 && sv.getHolder().getSurface() != null && sv.getHolder().getSurface().isValid()) {
+                    final Bitmap bm = Bitmap.createBitmap(sv.getWidth(), sv.getHeight(), Bitmap.Config.ARGB_8888);
+                    PixelCopy.request(sv, bm, copyResult -> {
+                        if (copyResult == PixelCopy.SUCCESS) {
+                            File out = getLocalThumbFile(camId);
+                            executor.execute(() -> {
+                                try (FileOutputStream fos = new FileOutputStream(out)) {
+                                    bm.compress(Bitmap.CompressFormat.JPEG, 82, fos);
+                                } catch (Exception ignored) {}
+                            });
+                        }
+                    }, mainHandler);
+                }
             } else {
                 executor.execute(() -> {
                     try {
@@ -3063,6 +3206,154 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         } catch (Throwable ignored) {}
+    }
+
+    private void captureAndShareSnapshot(PlayerView pv, final String title, final int camIdForCache) {
+        try {
+            if (pv == null) return;
+            View surface = pv.getVideoSurfaceView();
+            if (surface instanceof TextureView) {
+                Bitmap bm = ((TextureView) surface).getBitmap();
+                if (bm != null) {
+                    processCapturedBitmap(bm, title, camIdForCache);
+                    return;
+                }
+            } else if (surface instanceof SurfaceView && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                SurfaceView sv = (SurfaceView) surface;
+                if (sv.getWidth() > 0 && sv.getHeight() > 0 && sv.getHolder().getSurface() != null && sv.getHolder().getSurface().isValid()) {
+                    final Bitmap bm = Bitmap.createBitmap(sv.getWidth(), sv.getHeight(), Bitmap.Config.ARGB_8888);
+                    PixelCopy.request(sv, bm, copyResult -> {
+                        if (copyResult == PixelCopy.SUCCESS) {
+                            processCapturedBitmap(bm, title, camIdForCache);
+                        } else {
+                            Toast.makeText(MainActivity.this, "Esperando fotograma de video activo...", Toast.LENGTH_SHORT).show();
+                        }
+                    }, mainHandler);
+                    return;
+                }
+            }
+            Toast.makeText(this, "Esperando imagen de video para capturar...", Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            Toast.makeText(this, "No se pudo capturar imagen", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void processCapturedBitmap(final Bitmap bm, final String title, final int camIdForCache) {
+        executor.execute(() -> {
+            try {
+                if (camIdForCache > 0) {
+                    File thumbOut = getLocalThumbFile(camIdForCache);
+                    try (FileOutputStream fos = new FileOutputStream(thumbOut)) {
+                        bm.compress(Bitmap.CompressFormat.JPEG, 85, fos);
+                    } catch (Exception ignored) {}
+                }
+
+                File snapDir = new File(getCacheDir(), "snapshots");
+                if (!snapDir.exists()) snapDir.mkdirs();
+                final File snapFile = new File(snapDir, "LimenEyes_" + System.currentTimeMillis() + ".jpg");
+                try (FileOutputStream fos = new FileOutputStream(snapFile)) {
+                    bm.compress(Bitmap.CompressFormat.JPEG, 92, fos);
+                }
+
+                // Guardar también en Galería del teléfono (MediaStore)
+                try {
+                    String fileName = "LimenEyes_Foto_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".jpg";
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+                    values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/LimenEyes");
+                        values.put(MediaStore.Images.Media.IS_PENDING, 1);
+                    }
+                    Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                            if (out != null) bm.compress(Bitmap.CompressFormat.JPEG, 92, out);
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            values.clear();
+                            values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                            getContentResolver().update(uri, values, null, null);
+                        }
+                    }
+                } catch (Exception ignored) {}
+
+                mainHandler.post(() -> {
+                    logAppEvent("Captura guardada: " + title);
+                    showSnapshotPreviewDialog(snapFile, bm, title);
+                });
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void showSnapshotPreviewDialog(final File photoFile, final Bitmap bm, final String title) {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundBg(COLOR_BG_CARD, 16, COLOR_BORDER_DARK, 1));
+        card.setPadding(dp(18), dp(18), dp(18), dp(18));
+
+        TextView head = new TextView(this);
+        head.setText("Fotografía Capturada");
+        styleText(head, 16, COLOR_TEXT_WHITE, true);
+        card.addView(head);
+
+        TextView sub = new TextView(this);
+        sub.setText(title + " · Guardada en Galería");
+        styleText(sub, 12, COLOR_ACCENT_CYAN, false);
+        sub.setPadding(0, dp(4), 0, dp(12));
+        card.addView(sub);
+
+        ImageView previewIv = new ImageView(this);
+        previewIv.setImageBitmap(bm);
+        previewIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewIv.setBackground(roundBg("#000000", 8, COLOR_BORDER_DARK, 1));
+        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(190));
+        ivLp.bottomMargin = dp(16);
+        card.addView(previewIv, ivLp);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button btnClose = new Button(this);
+        btnClose.setText("Cerrar");
+        btnClose.setAllCaps(false);
+        btnClose.setTextColor(Color.parseColor(COLOR_TEXT_GRAY));
+        btnClose.setBackground(roundBg(COLOR_BG_ELEVATED, 10, COLOR_BORDER_DARK, 1));
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout.LayoutParams b1Lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        b1Lp.rightMargin = dp(8);
+        btnRow.addView(btnClose, b1Lp);
+
+        Button btnShare = new Button(this);
+        btnShare.setText("Compartir");
+        btnShare.setAllCaps(false);
+        btnShare.setTextColor(Color.WHITE);
+        btnShare.setBackground(roundBg(COLOR_ACCENT_BLUE, 10, null, 0));
+        btnShare.setOnClickListener(v -> {
+            dialog.dismiss();
+            try {
+                Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photoFile);
+                Intent share = new Intent(Intent.ACTION_SEND);
+                share.setType("image/jpeg");
+                share.putExtra(Intent.EXTRA_STREAM, uri);
+                share.putExtra(Intent.EXTRA_TEXT, "Captura LimenEyes: " + title);
+                share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(share, "Compartir fotografía"));
+            } catch (Exception e) {
+                Toast.makeText(this, "Error al compartir imagen", Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnRow.addView(btnShare, new LinearLayout.LayoutParams(0, dp(42), 1f));
+
+        card.addView(btnRow);
+        dialog.setContentView(card);
+        dialog.show();
     }
 
     // =========================================================================
@@ -3147,7 +3438,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (holder.player == null) {
                 DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(1500, 5000, 500, 1000)
+                        .setBufferDurationsMs(800, 3500, 150, 400)
                         .setPrioritizeTimeOverSizeThresholds(true)
                         .build();
 
@@ -4150,11 +4441,25 @@ public class MainActivity extends AppCompatActivity {
         btnPlayPause.setOnClickListener(v -> togglePlaybackPlayPause());
         primaryControls.addView(btnPlayPause, new LinearLayout.LayoutParams(0, dp(34), 1f));
 
-        // Velocidad 1X
+        // Velocidad interactiva (1X -> 2X -> 4X -> 0.5X)
         TextView speedTv = new TextView(this);
-        speedTv.setText("1X");
-        styleText(speedTv, 13, COLOR_TEXT_WHITE, true);
+        speedTv.setText(currentPlaybackSpeed == 0.5f ? "0.5X" : ((int) currentPlaybackSpeed + "X"));
+        styleText(speedTv, 13, currentPlaybackSpeed == 1.0f ? COLOR_TEXT_WHITE : COLOR_ACCENT_CYAN, true);
         speedTv.setGravity(Gravity.CENTER);
+        speedTv.setOnClickListener(v -> {
+            if (currentPlaybackSpeed == 1.0f) currentPlaybackSpeed = 2.0f;
+            else if (currentPlaybackSpeed == 2.0f) currentPlaybackSpeed = 4.0f;
+            else if (currentPlaybackSpeed == 4.0f) currentPlaybackSpeed = 0.5f;
+            else currentPlaybackSpeed = 1.0f;
+
+            String label = currentPlaybackSpeed == 0.5f ? "0.5X" : ((int) currentPlaybackSpeed + "X");
+            speedTv.setText(label);
+            styleText(speedTv, 13, currentPlaybackSpeed == 1.0f ? COLOR_TEXT_WHITE : COLOR_ACCENT_CYAN, true);
+            if (playbackPlayer != null) {
+                playbackPlayer.setPlaybackSpeed(currentPlaybackSpeed);
+            }
+            Toast.makeText(this, "Velocidad de reproducción: " + label, Toast.LENGTH_SHORT).show();
+        });
         primaryControls.addView(speedTv, new LinearLayout.LayoutParams(0, dp(34), 1f));
 
         // Paso de cuadro / Salto 10s
@@ -4194,8 +4499,14 @@ public class MainActivity extends AppCompatActivity {
         circularTools.setPadding(dp(10), dp(12), dp(10), dp(12));
 
         circularTools.addView(createPlaybackCircleTool(LimenIcons.ICON_CAMERA, "Capturar", () -> {
-            if (playbackPlayer != null) Toast.makeText(this, "Captura de fotograma guardada", Toast.LENGTH_SHORT).show();
-            else Toast.makeText(this, "Inicie primero la reproducción", Toast.LENGTH_SHORT).show();
+            if (playbackPlayer != null && playbackPlayerView != null) {
+                String camTitle = activePlaybackCamera != null
+                        ? (activePlaybackCamera.getGroupTitle() + " - " + activePlaybackCamera.getCompactBadgeLabel() + " (" + activePlaybackDate + ")")
+                        : "Grabación";
+                captureAndShareSnapshot(playbackPlayerView, camTitle, 0);
+            } else {
+                Toast.makeText(this, "Inicie primero la reproducción", Toast.LENGTH_SHORT).show();
+            }
         }), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         circularTools.addView(createPlaybackRecordButton(), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -5006,6 +5317,8 @@ public class MainActivity extends AppCompatActivity {
         if (playbackCells[selectedPlaybackCell] == null) return;
         FrameLayout cell = playbackCells[selectedPlaybackCell];
         cell.removeAllViews();
+        cell.setClipChildren(true);
+        cell.setClipToPadding(true);
 
         playbackPlayerView = new PlayerView(this);
         playbackPlayerView.setUseController(false);
@@ -5017,6 +5330,15 @@ public class MainActivity extends AppCompatActivity {
             playbackPlayerView.setPlayer(playbackPlayer);
         }
         cell.addView(playbackPlayerView);
+
+        // Zoom Pinch-to-Zoom (1.0x a 6.0x) y Pan en Grabaciones
+        attachZoomAndPanGesture(
+                cell,
+                playbackPlayerView,
+                null,
+                () -> togglePlaybackGridMode(selectedPlaybackCell),
+                this::showPlaybackSelectorModal
+        );
 
         // Spinner
         playbackSpinner = new ProgressBar(this);
@@ -5278,7 +5600,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (playbackPlayer == null) {
                 DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(2000, 30000, 1000, 2000)
+                        .setBufferDurationsMs(1200, 20000, 250, 600)
                         .setPrioritizeTimeOverSizeThresholds(true)
                         .build();
 
@@ -5302,6 +5624,19 @@ public class MainActivity extends AppCompatActivity {
                             if (playbackPlayPauseIcon != null) playbackPlayPauseIcon.setIconType(LimenIcons.ICON_PLAY);
                             isPlaybackPlaying = false;
                             isPlaybackLoading = false;
+                            // Auto-continuar al siguiente clip de grabación disponible (estilo DMSS / Hik-Connect)
+                            if (currentlyPlayingInterval != null && !playbackIntervals.isEmpty()) {
+                                int idx = playbackIntervals.indexOf(currentlyPlayingInterval);
+                                if (idx >= 0 && idx + 1 < playbackIntervals.size()) {
+                                    final RecordingInterval nextClip = playbackIntervals.get(idx + 1);
+                                    mainHandler.postDelayed(() -> {
+                                        if (currentTab == 4) {
+                                            Toast.makeText(MainActivity.this, "Continuando siguiente clip (" + nextClip.start + ")", Toast.LENGTH_SHORT).show();
+                                            playRecordingInterval(nextClip);
+                                        }
+                                    }, 350);
+                                }
+                            }
                         }
                     }
 
@@ -5335,6 +5670,7 @@ public class MainActivity extends AppCompatActivity {
                     new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(httpDataSourceFactory)
                             .createMediaSource(MediaItem.fromUri(Uri.parse(fullUrl)));
             playbackPlayer.setMediaSource(mediaSource);
+            playbackPlayer.setPlaybackSpeed(currentPlaybackSpeed);
             playbackPlayer.prepare();
             playbackPlayer.setPlayWhenReady(true);
         } catch (Throwable t) {
